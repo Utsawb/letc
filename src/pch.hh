@@ -32,13 +32,11 @@
 #include <vulkan/vulkan_shared.hpp>
 #include <vulkan/vulkan_structs.hpp>
 
-#include "openxr/openxr_platform_defines.h"
+#include "openxr/openxr.h"
 
 #include <vkfw/vkfw.hpp>
 
 #include "vk_mem_alloc.h"
-
-#include "spirv_cross.hpp"
 
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>

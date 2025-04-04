@@ -28,6 +28,10 @@ struct Light
 
 struct App
 {
+    XrDebugUtilsMessengerEXT xrDebugUtilsMessenger = nullptr;
+    XrInstance xrInstance = nullptr;
+    XrSystemId xrSystemId = XR_NULL_SYSTEM_ID;
+
     std::unique_ptr<letc::Instance> instance;
     vkfw::UniqueWindow window;
     vk::UniqueSurfaceKHR surface;
@@ -67,6 +71,47 @@ struct App
     size_t currentFrame = 0;
     App()
     {
+        // setup debug messenger
+        XrDebugUtilsMessengerCreateInfoEXT debugUtilsMessengerInfo = {XR_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT};
+        debugUtilsMessengerInfo.next = nullptr;
+        debugUtilsMessengerInfo.messageSeverities = XR_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+                                                   XR_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                                   XR_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;
+        debugUtilsMessengerInfo.messageTypes = XR_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                                                    XR_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                                                    XR_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+        debugUtilsMessengerInfo.userCallback = [](XrDebugUtilsMessageSeverityFlagsEXT messageSeverity,
+                                                   XrDebugUtilsMessageTypeFlagsEXT messageTypes,
+                                                   const XrDebugUtilsMessengerCallbackDataEXT *callbackData,
+                                                   void *userData) -> XrBool32
+        {
+            std::cerr << "OpenXR: " << callbackData->message << std::endl;
+            return XR_FALSE;
+        };
+        debugUtilsMessengerInfo.userData = nullptr;
+
+        XrInstanceCreateInfo xrInstanceInfo = {XR_TYPE_INSTANCE_CREATE_INFO};
+        xrInstanceInfo.next = &debugUtilsMessengerInfo;
+        xrInstanceInfo.createFlags = 0;
+        xrInstanceInfo.applicationInfo = {.applicationName = "Dev",
+                                          .applicationVersion = 1,
+                                          .engineName = "Little Engine that Could",
+                                          .engineVersion = 1,
+                                          .apiVersion = XR_API_VERSION_1_0};
+
+        const char *requiredExtensions[] = {"XR_KHR_vulkan_enable2", XR_EXT_DEBUG_UTILS_EXTENSION_NAME};
+        xrInstanceInfo.enabledApiLayerCount = 0;
+        xrInstanceInfo.enabledApiLayerNames = nullptr;
+        xrInstanceInfo.enabledExtensionCount = 1;
+        xrInstanceInfo.enabledExtensionNames = requiredExtensions;
+
+        XrResult result = xrCreateInstance(&xrInstanceInfo, &xrInstance);
+        assertThrow(result == XR_SUCCESS, "failed to create OpenXR instance");
+        std::cout << "OpenXR instance created successfully" << std::endl;
+
+        // get the vulkan extensions needed for OpenXR
+        uint32_t xrVulkanInstanceExtensionCount = 0;
+
         // basic initialization
         VULKAN_HPP_DEFAULT_DISPATCHER.init();
         vkfw::init();
@@ -125,10 +170,12 @@ struct App
 
         models.emplace_back(*allocator, resourcePath / "Avocado.glb");
         models.emplace_back(*allocator, resourcePath / "platform.glb");
-        std::for_each(models.begin(), models.end(), [](letc::Model &m) { m.cpyAttributes(); });
+        std::for_each(models.begin(), models.end(), [](letc::Model &m)
+                      { m.cpyAttributes(); });
 
         std::for_each(models.begin(), models.end(),
-                      [this](const letc::Model &m) { modelUniforms.push_back(m.uniform); });
+                      [this](const letc::Model &m)
+                      { modelUniforms.push_back(m.uniform); });
         modelUniformsBuffer =
             std::make_unique<letc::Buffer>(*allocator, sizeof(letc::Model::UniformBuffer) * models.size(),
                                            vk::BufferUsageFlagBits::eUniformBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
@@ -189,7 +236,8 @@ struct App
                                          .setLayerCount(1)));
 
         std::tie(lastMouseX, lastMouseY) = window->getCursorPos();
-        window->callbacks()->on_scroll = [this](vkfw::Window const &, double x, double y) {
+        window->callbacks()->on_scroll = [this](vkfw::Window const &, double x, double y)
+        {
             camera->zoom(static_cast<float>(y));
         };
     }
