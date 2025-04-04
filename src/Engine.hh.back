@@ -1,0 +1,163 @@
+#pragma once
+#include <memory>
+#include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan_enums.hpp>
+#ifndef LETC_ENGINE_HH
+#define LETC_ENGINE_HH
+
+#include "pch.hh"
+
+#include "Device.hh"
+#include "Instance.hh"
+#include "Swapchain.hh"
+#include "Window.hh"
+
+namespace letc
+{
+    struct Engine
+    {
+        std::unique_ptr<Instance> m_instance;
+        vkfw::UniqueWindow m_window;
+        vk::UniqueSurfaceKHR m_surface;
+
+        std::unique_ptr<Device> m_device;
+        vk::Queue m_queue;
+        std::unique_ptr<Swapchain> m_swapchain;
+
+        std::unique_ptr<VmaAllocator_T, VmaAllocatorDeleter> m_allocator;
+        vk::UniqueCommandPool m_commandPool;
+        vk::UniqueCommandBuffer m_commandBuffer;
+        uint32_t m_currentImageIndex = 0;
+        vk::UniqueFence m_imageFence;
+        vk::UniqueFence m_commandFence;
+
+        Engine()
+        {
+            VULKAN_HPP_DEFAULT_DISPATCHER.init();
+            vkfw::init();
+
+            vkfw::WindowHints windowHints{};
+            m_window = vkfw::createWindowUnique(WindowBuilder{});
+            m_instance = std::make_unique<Instance>(InstanceBuilder{}.setDebug(true));
+            VULKAN_HPP_DEFAULT_DISPATCHER.init(m_instance->instance);
+
+            m_surface = vkfw::createWindowSurfaceUnique(*m_instance, *m_window);
+            assertThrow(m_surface, "failed to create surface");
+            m_device = std::make_unique<Device>(*m_instance);
+            VULKAN_HPP_DEFAULT_DISPATCHER.init(m_device->device);
+
+            // swapchain
+            m_swapchain = std::make_unique<Swapchain>(*m_window, *m_surface, *m_device, *m_device);
+
+            // queue
+            m_queue = m_device->device.getQueue(m_device->graphicsQueueFamilyIndex, 0);
+
+            // allocator
+            VmaAllocatorCreateInfo allocatorInfo{};
+            allocatorInfo.instance = m_instance->instance;
+            allocatorInfo.physicalDevice = m_device->physicalDevice;
+            allocatorInfo.device = m_device->device;
+            allocatorInfo.vulkanApiVersion = InstanceBuilder{}.applicationInfo.apiVersion;
+            VmaAllocator allocator;
+            assertThrow(vmaCreateAllocator(&allocatorInfo, &allocator) || true, "failed to create allocator");
+            m_allocator = std::unique_ptr<VmaAllocator_T, VmaAllocatorDeleter>(allocator, VmaAllocatorDeleter());
+
+            // command pool
+            m_commandPool = m_device->device.createCommandPoolUnique(
+                vk::CommandPoolCreateInfo{}
+                    .setQueueFamilyIndex(m_device->graphicsQueueFamilyIndex)
+                    .setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer));
+            m_commandBuffer =
+                std::move(m_device->device
+                              .allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo{}
+                                                                .setCommandBufferCount(1)
+                                                                .setCommandPool(m_commandPool.get())
+                                                                .setLevel(vk::CommandBufferLevel::ePrimary))
+                              .at(0));
+
+            // fence
+            m_imageFence = m_device->device.createFenceUnique(vk::FenceCreateInfo{});
+            m_commandFence = m_device->device.createFenceUnique(vk::FenceCreateInfo{});
+        }
+
+        void beginFrame()
+        {
+            auto [result, imageIndex] =
+                m_device->device.acquireNextImageKHR(*m_swapchain, 5000000000, nullptr, m_imageFence.get());
+            assertThrow(result == vk::Result::eSuccess, "failed to acquire next image: " + vk::to_string(result));
+            m_currentImageIndex = imageIndex;
+
+            m_commandBuffer->reset(vk::CommandBufferResetFlagBits::eReleaseResources);
+            m_commandBuffer->begin(
+                vk::CommandBufferBeginInfo{}.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+            m_commandBuffer->setScissor(
+                0, 1,
+                &vk::Rect2D{}.setOffset({0, 0}).setExtent(
+                    {static_cast<uint32_t>(m_window->getWidth()), static_cast<uint32_t>(m_window->getHeight())}));
+            m_commandBuffer->setViewport(0, 1,
+                                         &vk::Viewport{}
+                                              .setX(0.0f)
+                                              .setY(0.0f)
+                                              .setWidth(static_cast<float>(m_window->getWidth()))
+                                              .setHeight(static_cast<float>(m_window->getHeight()))
+                                              .setMinDepth(0.0f)
+                                              .setMaxDepth(1.0f));
+        }
+
+        void endFrame()
+        {
+            m_commandBuffer->pipelineBarrier(
+                vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eBottomOfPipe, {}, 0,
+                nullptr, 0, nullptr, 1,
+                &vk::ImageMemoryBarrier{}
+                     .setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite)
+                     .setDstAccessMask(vk::AccessFlagBits::eMemoryRead)
+                     .setOldLayout(vk::ImageLayout::eColorAttachmentOptimal)
+                     .setNewLayout(vk::ImageLayout::ePresentSrcKHR)
+                     .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                     .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                     .setImage(m_swapchain->images.at(m_currentImageIndex))
+                     .setSubresourceRange(vk::ImageSubresourceRange{}
+                                              .setAspectMask(vk::ImageAspectFlagBits::eColor)
+                                              .setBaseMipLevel(0)
+                                              .setLevelCount(1)
+                                              .setBaseArrayLayer(0)
+                                              .setLayerCount(1)));
+
+            m_commandBuffer->end();
+
+            assertThrow(m_device->device.resetFences(1, &m_commandFence.get()) == vk::Result::eSuccess,
+                        "failed to reset command fence");
+
+            m_queue.submit(vk::SubmitInfo{}.setCommandBufferCount(1).setPCommandBuffers(&m_commandBuffer.get()),
+                           m_commandFence.get());
+
+            assertThrow(m_device->device.waitForFences(1, &m_commandFence.get(), VK_TRUE, 5000000000) ==
+                            vk::Result::eSuccess,
+                        "failed to wait for command fence");
+
+            assertThrow(m_device->device.waitForFences(1, &m_imageFence.get(), VK_TRUE, 5000000000) ==
+                            vk::Result::eSuccess,
+                        "failed to wait for image fence");
+
+            assertThrow(m_queue.presentKHR(vk::PresentInfoKHR{}
+                                               .setWaitSemaphoreCount(0)
+                                               .setPWaitSemaphores(nullptr)
+                                               .setSwapchainCount(1)
+                                               .setPSwapchains(&m_swapchain->swapchain)
+                                               .setPImageIndices(&m_currentImageIndex)
+                                               .setPNext(nullptr)) == vk::Result::eSuccess,
+                        "failed to present image");
+
+            assertThrow(m_device->device.resetFences(1, &m_imageFence.get()) == vk::Result::eSuccess,
+                        "failed to reset image fence");
+        }
+
+        ~Engine()
+        {
+            m_device->device.waitIdle();
+        }
+    };
+}; // namespace letc
+
+#endif // LETC_ENGINE_HH
