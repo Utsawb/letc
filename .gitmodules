@@ -1,0 +1,21 @@
+[submodule "external/OpenXR-SDK"]
+	path = external/OpenXR-SDK
+	url = https://github.com/KhronosGroup/OpenXR-SDK.git
+[submodule "external/OpenXR-Hpp"]
+	path = external/OpenXR-Hpp
+	url = https://github.com/KhronosGroup/OpenXR-Hpp.git
+[submodule "external/glm"]
+	path = external/glm
+	url = https://github.com/g-truc/glm.git
+[submodule "external/glfw"]
+	path = external/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "external/vkfw"]
+	path = external/vkfw
+	url = https://github.com/Cvelth/vkfw.git
+[submodule "external/VulkanMemoryAllocator"]
+	path = external/VulkanMemoryAllocator
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+[submodule "external/assimp"]
+	path = external/assimp
+	url = https://github.com/assimp/assimp.git
