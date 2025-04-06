@@ -92,8 +92,7 @@ namespace letc
                 vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError);
             debugMessengerInfo.setMessageType(vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
                                               vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
-                                              vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance |
-                                              vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding);
+                                              vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance);
             debugMessengerInfo.setPfnUserCallback(&debugCallback);
         }
 

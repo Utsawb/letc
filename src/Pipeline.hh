@@ -209,15 +209,14 @@ namespace letc
     struct GraphicsPipeline
     {
         const Device &device;
-        const Swapchain &swapchain;
         GraphicsPipelineBuilder builder;
         std::vector<vk::ShaderModule> shaders;
         vk::PipelineLayout layout;
         vk::Pipeline pipeline;
 
-        GraphicsPipeline(const Device &device, const Swapchain &swapchain,
+        GraphicsPipeline(const Device &device,
                   const GraphicsPipelineBuilder &graphicsPipelineBuilder)
-            : device(device), swapchain(swapchain), builder(graphicsPipelineBuilder)
+            : device(device), builder(graphicsPipelineBuilder)
         {
             for (auto &code : builder.shaderCode)
             {

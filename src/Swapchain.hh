@@ -32,7 +32,8 @@ namespace letc
                 Surface -> Swapchain values
             */
             capabilities = physicalDevice.getSurfaceCapabilitiesKHR(surface);
-            format = physicalDevice.getSurfaceFormatsKHR(surface).front();
+            // format = physicalDevice.getSurfaceFormatsKHR(surface).front();
+            format = vk::Format::eR8G8B8A8Srgb;
             presentMode = vk::PresentModeKHR::eFifo;
 
             /*

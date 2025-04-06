@@ -17,6 +17,7 @@
 
 #define GLM_ENABLE_EXPERIMENTAL
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_FORCE_RADIANS
 
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_transform.hpp"
@@ -32,7 +33,11 @@
 #include <vulkan/vulkan_shared.hpp>
 #include <vulkan/vulkan_structs.hpp>
 
-#include "openxr/openxr.h"
+#define XR_USE_GRAPHICS_API_VULKAN
+
+#include <openxr/openxr_platform.h>
+#include <openxr/openxr.h>
+#include "openxr.hpp"
 
 #include <vkfw/vkfw.hpp>
 

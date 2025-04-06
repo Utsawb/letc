@@ -41,6 +41,18 @@ namespace letc
             deviceExtensions.push_back(vk::KHRDynamicRenderingExtensionName);
             deviceExtensions.push_back(vk::KHRSwapchainExtensionName);
 
+            // this is what i get for not making the device selector more extensable,
+            // but like cmon this is kinda messed up!! delete these once I remove
+            // open xr from this project, me and my homies hate open xr (!)
+            deviceExtensions.push_back(vk::KHRExternalMemoryExtensionName);
+            deviceExtensions.push_back(vk::KHRExternalSemaphoreExtensionName);
+            deviceExtensions.push_back(vk::KHRDedicatedAllocationExtensionName);
+            deviceExtensions.push_back(vk::KHRGetMemoryRequirements2ExtensionName);
+            deviceExtensions.push_back("VK_KHR_external_memory_win32");
+            deviceExtensions.push_back("VK_KHR_win32_keyed_mutex");
+            // deviceExtensions.push_back("VK_EXT_debug_marker");
+
+
             /*
                 Physical Device
             */
