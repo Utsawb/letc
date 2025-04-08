@@ -275,6 +275,12 @@ namespace letc
             }
         }
     };
+
+    class IPipeline
+    {
+
+    };
+
 }; // namespace letc
 
 #endif // LETC_PIPELINE_HH

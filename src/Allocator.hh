@@ -18,8 +18,7 @@ namespace letc
         VmaAllocator allocator;
         vk::DescriptorPool descriptorPool;
 
-        Allocator(const Instance &instance, Device &device)
-            : instance(instance), device(device)
+        Allocator(const Instance &instance, Device &device) : instance(instance), device(device)
         {
             VmaAllocatorCreateInfo allocatorInfo{};
             allocatorInfo.instance = instance.instance;
@@ -35,7 +34,6 @@ namespace letc
             descriptorPoolSizes.push_back(vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, 1024});
             descriptorPoolSizes.push_back(vk::DescriptorPoolSize{vk::DescriptorType::eStorageBufferDynamic, 1024});
             descriptorPoolSizes.push_back(vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler, 1024});
-
 
             vk::DescriptorPoolCreateInfo descriptorPoolInfo{};
             descriptorPoolInfo.setMaxSets(1024);

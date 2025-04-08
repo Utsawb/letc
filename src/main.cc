@@ -9,9 +9,9 @@
 #include "Material.hh"
 #include "Model.hh"
 #include "Pipeline.hh"
+#include "Points.hh"
 #include "Swapchain.hh"
 #include "Window.hh"
-#include "Points.hh"
 
 std::filesystem::path resourcePath = "../../resources/";
 
@@ -103,11 +103,9 @@ struct App
     {
         xrDispatchLoader = xr::DispatchLoaderDynamic{};
 
-        auto xrDebugCallback = [](XrDebugUtilsMessageSeverityFlagsEXT messageSeverity,
-                                  XrDebugUtilsMessageTypeFlagsEXT messageTypes,
-                                  const XrDebugUtilsMessengerCallbackDataEXT *pCallbackData,
-                                  void *pUserData) -> XrBool32
-        {
+        auto xrDebugCallback =
+            [](XrDebugUtilsMessageSeverityFlagsEXT messageSeverity, XrDebugUtilsMessageTypeFlagsEXT messageTypes,
+               const XrDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData) -> XrBool32 {
             std::cerr << "XrDebug: " << pCallbackData->messageId << ": " << pCallbackData->message << std::endl;
             return XR_FALSE;
         };
@@ -151,7 +149,11 @@ struct App
         // window and vulkan initialization
         vkfw::WindowHints windowHints{};
         window = vkfw::createWindowUnique(letc::WindowBuilder{});
-        instance = std::make_unique<letc::Instance>(letc::InstanceBuilder{}.setDebug(true).addInstanceExtension("VK_KHR_external_memory_capabilities").addInstanceExtension("VK_KHR_get_physical_device_properties2"));
+        instance =
+            std::make_unique<letc::Instance>(letc::InstanceBuilder{}
+                                                 .setDebug(true)
+                                                 .addInstanceExtension("VK_KHR_external_memory_capabilities")
+                                                 .addInstanceExtension("VK_KHR_get_physical_device_properties2"));
         VULKAN_HPP_DEFAULT_DISPATCHER.init(instance->instance);
 
         // window surface creation
@@ -159,7 +161,8 @@ struct App
         assertThrow(surface, "failed to create surface");
 
         auto xrGraphicsRequirements = xrInstance->getVulkanGraphicsRequirements2KHR(xrSystemId, xrDispatchLoader);
-        auto xrGraphicsDevice = xrInstance->getVulkanGraphicsDevice2KHR(xr::VulkanGraphicsDeviceGetInfoKHR{xrSystemId, instance->instance, nullptr}, xrDispatchLoader);
+        auto xrGraphicsDevice = xrInstance->getVulkanGraphicsDevice2KHR(
+            xr::VulkanGraphicsDeviceGetInfoKHR{xrSystemId, instance->instance, nullptr}, xrDispatchLoader);
         auto xrGraphicsDeviceExtensions = xrInstance->getVulkanDeviceExtensionsKHR(xrSystemId, xrDispatchLoader);
 
         device = std::make_unique<letc::Device>(*instance);
@@ -239,16 +242,25 @@ struct App
             handPoseAction = actionSet->createActionUnique(handPoseActionInfo, xrDispatchLoader);
 
             // Suggest bindings for a common controller profile (example: Oculus Touch).
-            xr::Path oculusTouchInteractionProfile = xrInstance->stringToPath("/interaction_profiles/oculus/touch_controller", xrDispatchLoader);
+            xr::Path oculusTouchInteractionProfile =
+                xrInstance->stringToPath("/interaction_profiles/oculus/touch_controller", xrDispatchLoader);
             std::vector<xr::ActionSuggestedBinding> bindings;
-            bindings.push_back({*triggerAction, xrInstance->stringToPath("/user/hand/left/input/trigger", xrDispatchLoader)});
-            bindings.push_back({*triggerAction, xrInstance->stringToPath("/user/hand/right/input/trigger", xrDispatchLoader)});
-            bindings.push_back({*joystickAction, xrInstance->stringToPath("/user/hand/left/input/thumbstick", xrDispatchLoader)});
-            bindings.push_back({*joystickAction, xrInstance->stringToPath("/user/hand/right/input/thumbstick", xrDispatchLoader)});
-            bindings.push_back({*faceButtonAction, xrInstance->stringToPath("/user/hand/left/input/x", xrDispatchLoader)});
-            bindings.push_back({*faceButtonAction, xrInstance->stringToPath("/user/hand/right/input/a", xrDispatchLoader)});
-            bindings.push_back({*handPoseAction, xrInstance->stringToPath("/user/hand/left/input/aim/pose", xrDispatchLoader)});
-            bindings.push_back({*handPoseAction, xrInstance->stringToPath("/user/hand/right/input/aim/pose", xrDispatchLoader)});
+            bindings.push_back(
+                {*triggerAction, xrInstance->stringToPath("/user/hand/left/input/trigger", xrDispatchLoader)});
+            bindings.push_back(
+                {*triggerAction, xrInstance->stringToPath("/user/hand/right/input/trigger", xrDispatchLoader)});
+            bindings.push_back(
+                {*joystickAction, xrInstance->stringToPath("/user/hand/left/input/thumbstick", xrDispatchLoader)});
+            bindings.push_back(
+                {*joystickAction, xrInstance->stringToPath("/user/hand/right/input/thumbstick", xrDispatchLoader)});
+            bindings.push_back(
+                {*faceButtonAction, xrInstance->stringToPath("/user/hand/left/input/x", xrDispatchLoader)});
+            bindings.push_back(
+                {*faceButtonAction, xrInstance->stringToPath("/user/hand/right/input/a", xrDispatchLoader)});
+            bindings.push_back(
+                {*handPoseAction, xrInstance->stringToPath("/user/hand/left/input/aim/pose", xrDispatchLoader)});
+            bindings.push_back(
+                {*handPoseAction, xrInstance->stringToPath("/user/hand/right/input/aim/pose", xrDispatchLoader)});
 
             xr::InteractionProfileSuggestedBinding suggestedBinding{};
             suggestedBinding.interactionProfile = oculusTouchInteractionProfile;
@@ -281,11 +293,13 @@ struct App
         }
 
         auto xrViewConfig = xrInstance->enumerateViewConfigurationsToVector(xrSystemId, xrDispatchLoader);
-        auto stereo = std::find_if(xrViewConfig.begin(), xrViewConfig.end(), [](xr::ViewConfigurationType &vc)
-                                   { return vc == xr::ViewConfigurationType::PrimaryStereo; });
+        auto stereo = std::find_if(xrViewConfig.begin(), xrViewConfig.end(), [](xr::ViewConfigurationType &vc) {
+            return vc == xr::ViewConfigurationType::PrimaryStereo;
+        });
         assertThrow(stereo != xrViewConfig.end(), "failed to find stereo headset");
 
-        xrViewConfigurationViews = xrInstance->enumerateViewConfigurationViewsToVector(xrSystemId, *stereo, xrDispatchLoader);
+        xrViewConfigurationViews =
+            xrInstance->enumerateViewConfigurationViewsToVector(xrSystemId, *stereo, xrDispatchLoader);
 
         xr::ReferenceSpaceCreateInfo xrSpaceInfo{};
         xrSpaceInfo.next = nullptr;
@@ -294,8 +308,8 @@ struct App
         xrSpace = xrSession->createReferenceSpaceUnique(xrSpaceInfo, xrDispatchLoader);
 
         auto xrSwapchainFormat = xrSession->enumerateSwapchainFormatsToVector(xrDispatchLoader);
-        auto it = std::find_if(xrSwapchainFormat.begin(), xrSwapchainFormat.end(), [this](int64_t &f)
-                               { return f == (long long)swapchain->format.format; });
+        auto it = std::find_if(xrSwapchainFormat.begin(), xrSwapchainFormat.end(),
+                               [this](int64_t &f) { return f == (long long)swapchain->format.format; });
         assertThrow(it != xrSwapchainFormat.end(), "failed to find swapchain format");
         this->xrSwapchainFormat = *it;
         // std::cout << std::format("Prefered format: {}\n", *it);
@@ -303,7 +317,8 @@ struct App
         xr::SwapchainCreateInfo xrSwapchainInfo{};
         xrSwapchainInfo.next = nullptr;
         xrSwapchainInfo.createFlags = xr::SwapchainCreateFlagBits::None;
-        xrSwapchainInfo.usageFlags = xr::SwapchainUsageFlagBits::ColorAttachment | xr::SwapchainUsageFlagBits::TransferSrc | xr::SwapchainUsageFlagBits::TransferDst;
+        xrSwapchainInfo.usageFlags = xr::SwapchainUsageFlagBits::ColorAttachment |
+                                     xr::SwapchainUsageFlagBits::TransferSrc | xr::SwapchainUsageFlagBits::TransferDst;
         xrSwapchainInfo.format = (long long)swapchain->format.format;
         xrSwapchainInfo.sampleCount = 1;
         xrSwapchainInfo.width = xrViewConfigurationViews.at(0).recommendedImageRectWidth;
@@ -315,8 +330,10 @@ struct App
         xrSwapchain[0] = xrSession->createSwapchainUnique(xrSwapchainInfo, xrDispatchLoader);
         xrSwapchain[1] = xrSession->createSwapchainUnique(xrSwapchainInfo, xrDispatchLoader);
 
-        xrSwapchainImageVk[0] = xrSwapchain[0]->enumerateSwapchainImagesToVector<xr::SwapchainImageVulkanKHR>(xrDispatchLoader);
-        xrSwapchainImageVk[1] = xrSwapchain[1]->enumerateSwapchainImagesToVector<xr::SwapchainImageVulkanKHR>(xrDispatchLoader);
+        xrSwapchainImageVk[0] =
+            xrSwapchain[0]->enumerateSwapchainImagesToVector<xr::SwapchainImageVulkanKHR>(xrDispatchLoader);
+        xrSwapchainImageVk[1] =
+            xrSwapchain[1]->enumerateSwapchainImagesToVector<xr::SwapchainImageVulkanKHR>(xrDispatchLoader);
 
         swapchainImageViews[0].resize(xrSwapchainImageVk[0].size());
         swapchainImageViews[1].resize(xrSwapchainImageVk[1].size());
@@ -330,12 +347,13 @@ struct App
             imageSubresourceRange.setBaseArrayLayer(0);
             imageSubresourceRange.setLayerCount(1);
 
-            swapchainImageViews[0][i] = device->device.createImageViewUnique(vk::ImageViewCreateInfo{}
-                                                                                 .setImage(xrSwapchainImageVk[0][i].image)
-                                                                                 .setFormat(swapchain->format.format)
-                                                                                 .setViewType(vk::ImageViewType::e2D)
-                                                                                 .setComponents(vk::ComponentMapping{})
-                                                                                 .setSubresourceRange(imageSubresourceRange));
+            swapchainImageViews[0][i] =
+                device->device.createImageViewUnique(vk::ImageViewCreateInfo{}
+                                                         .setImage(xrSwapchainImageVk[0][i].image)
+                                                         .setFormat(swapchain->format.format)
+                                                         .setViewType(vk::ImageViewType::e2D)
+                                                         .setComponents(vk::ComponentMapping{})
+                                                         .setSubresourceRange(imageSubresourceRange));
         }
 
         for (size_t i = 0; i < swapchainImageViews[1].size(); i++)
@@ -347,12 +365,13 @@ struct App
             imageSubresourceRange.setBaseArrayLayer(0);
             imageSubresourceRange.setLayerCount(1);
 
-            swapchainImageViews[1][i] = device->device.createImageViewUnique(vk::ImageViewCreateInfo{}
-                                                                                 .setImage(xrSwapchainImageVk[1][i].image)
-                                                                                 .setFormat(swapchain->format.format)
-                                                                                 .setViewType(vk::ImageViewType::e2D)
-                                                                                 .setComponents(vk::ComponentMapping{})
-                                                                                 .setSubresourceRange(imageSubresourceRange));
+            swapchainImageViews[1][i] =
+                device->device.createImageViewUnique(vk::ImageViewCreateInfo{}
+                                                         .setImage(xrSwapchainImageVk[1][i].image)
+                                                         .setFormat(swapchain->format.format)
+                                                         .setViewType(vk::ImageViewType::e2D)
+                                                         .setComponents(vk::ComponentMapping{})
+                                                         .setSubresourceRange(imageSubresourceRange));
         }
 
         // command buffer initialization
@@ -360,11 +379,11 @@ struct App
             device->device.createCommandPoolUnique(vk::CommandPoolCreateInfo{}
                                                        .setQueueFamilyIndex(device->graphicsQueueFamilyIndex)
                                                        .setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer));
-        commandBuffers = std::move(device->device
-                                       .allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo{}
-                                                                         .setCommandBufferCount(3)
-                                                                         .setCommandPool(commandPool.get())
-                                                                         .setLevel(vk::CommandBufferLevel::ePrimary)));
+        commandBuffers =
+            std::move(device->device.allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo{}
+                                                                      .setCommandBufferCount(3)
+                                                                      .setCommandPool(commandPool.get())
+                                                                      .setLevel(vk::CommandBufferLevel::ePrimary)));
 
         // fence initialization
         imageFence = device->device.createFenceUnique(vk::FenceCreateInfo{});
@@ -394,11 +413,11 @@ struct App
 
         for (int i = 0; i < 2; ++i)
         {
-            xrCameras.push_back(std::make_unique<letc::Camera>(*allocator, glm::vec4{0.0f, 0.0f, 2.0f, 1.0f},
-                                                               glm::vec4{0.0f, 0.0f, 0.0f, 1.0f}, glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
-                                                               60.0f,
-                                                               static_cast<float>(xrViewConfigurationViews.at(0).recommendedImageRectWidth) /
-                                                                   static_cast<float>(xrViewConfigurationViews.at(0).recommendedImageRectHeight)));
+            xrCameras.push_back(std::make_unique<letc::Camera>(
+                *allocator, glm::vec4{0.0f, 0.0f, 2.0f, 1.0f}, glm::vec4{0.0f, 0.0f, 0.0f, 1.0f},
+                glm::vec4{0.0f, 1.0f, 0.0f, 1.0f}, 60.0f,
+                static_cast<float>(xrViewConfigurationViews.at(0).recommendedImageRectWidth) /
+                    static_cast<float>(xrViewConfigurationViews.at(0).recommendedImageRectHeight)));
         }
 
         models.emplace_back(*allocator, resourcePath / "Avocado.glb");
@@ -412,12 +431,10 @@ struct App
         models.at(0).uniform.model *= glm::scale(models.at(0).uniform.model, glm::vec3(modelScalingFactor));
         models.at(1).uniform.model *= glm::scale(models.at(1).uniform.model, glm::vec3(modelScalingFactor));
 
-        std::for_each(models.begin(), models.end(), [](letc::Model &m)
-                      { m.cpyAttributes(); });
+        std::for_each(models.begin(), models.end(), [](letc::Model &m) { m.cpyAttributes(); });
 
         std::for_each(models.begin(), models.end(),
-                      [this](const letc::Model &m)
-                      { modelUniforms.push_back(m.uniform); });
+                      [this](const letc::Model &m) { modelUniforms.push_back(m.uniform); });
         modelUniformsBuffer =
             std::make_unique<letc::Buffer>(*allocator, sizeof(letc::Model::UniformBuffer) * models.size(),
                                            vk::BufferUsageFlagBits::eUniformBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
@@ -460,12 +477,9 @@ struct App
         pbrPipeline = std::make_unique<letc::GraphicsPipeline>(*device, gpb);
 
         points = std::make_unique<letc::Points>(*allocator);
-        pointsRenderer = std::make_unique<letc::PointsRenderer>(
-            *allocator,
-            *device,
-            *swapchain,
-            readFile(resourcePath / "points.vert.spv"),
-            readFile(resourcePath / "points.frag.spv"));
+        pointsRenderer = std::make_unique<letc::PointsRenderer>(*allocator, *device, *swapchain,
+                                                                readFile(resourcePath / "points.vert.spv"),
+                                                                readFile(resourcePath / "points.frag.spv"));
 
         // depth buffer initialization
         depthBuffer = std::make_unique<letc::ImageBuffer<float>>(
@@ -488,8 +502,8 @@ struct App
         // make an xr depth buffer that uses the xrSwapchain dimentions
         xrDepthBuffer = std::make_unique<letc::ImageBuffer<float>>(
             allocator->allocator, static_cast<uint32_t>(xrViewConfigurationViews.at(0).recommendedImageRectWidth),
-            static_cast<uint32_t>(xrViewConfigurationViews.at(0).recommendedImageRectHeight),
-            vk::Format::eD32Sfloat, std::vector<float>(window->getWidth() * window->getHeight(), 0.0f),
+            static_cast<uint32_t>(xrViewConfigurationViews.at(0).recommendedImageRectHeight), vk::Format::eD32Sfloat,
+            std::vector<float>(window->getWidth() * window->getHeight(), 0.0f),
             vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eTransferSrc,
             vk::ImageTiling::eOptimal);
 
@@ -506,8 +520,7 @@ struct App
                                          .setLayerCount(1)));
 
         std::tie(lastMouseX, lastMouseY) = window->getCursorPos();
-        window->callbacks()->on_scroll = [this](vkfw::Window const &, double x, double y)
-        {
+        window->callbacks()->on_scroll = [this](vkfw::Window const &, double x, double y) {
             camera->zoom(static_cast<float>(y));
         };
 
@@ -534,15 +547,14 @@ struct App
 
     void triggersPressed(const glm::vec3 &handPosition)
     {
-        std::cout << "Trigger pressed! Hand position: ("
-                  << handPosition.x << ", " << handPosition.y << ", " << handPosition.z << ")\n";
+        std::cout << "Trigger pressed! Hand position: (" << handPosition.x << ", " << handPosition.y << ", "
+                  << handPosition.z << ")\n";
         points->points.push_back(handPosition);
     }
 
     void joystickMoved(const glm::vec2 &joystickPosition)
     {
-        std::cout << "Joystick moved! Position: ("
-                  << joystickPosition.x << ", " << joystickPosition.y << ")\n";
+        std::cout << "Joystick moved! Position: (" << joystickPosition.x << ", " << joystickPosition.y << ")\n";
     }
 
     const std::chrono::duration<long long, std::milli> BUTTON_DEBOUNCE_TIME = std::chrono::milliseconds(100);
@@ -628,20 +640,22 @@ struct App
         xr::ActionStateGetInfo triggerActionStateInfo{};
         triggerActionStateInfo.action = *triggerAction;
         triggerActionStateInfo.subactionPath = leftHandPath;
-        xr::ActionStateBoolean leftTriggerState = xrSession->getActionStateBoolean(triggerActionStateInfo, xrDispatchLoader);
+        xr::ActionStateBoolean leftTriggerState =
+            xrSession->getActionStateBoolean(triggerActionStateInfo, xrDispatchLoader);
         triggerActionStateInfo.subactionPath = rightHandPath;
-        xr::ActionStateBoolean rightTriggerState = xrSession->getActionStateBoolean(triggerActionStateInfo, xrDispatchLoader);
+        xr::ActionStateBoolean rightTriggerState =
+            xrSession->getActionStateBoolean(triggerActionStateInfo, xrDispatchLoader);
 
         xr::SpaceLocation leftLocation;
         if (predictedDisplayTime != 0.0f)
         {
             leftLocation = xrSpace->locateSpace(*leftHandSpace, predictedDisplayTime, xrDispatchLoader);
-            glm::mat4 leftTranslation = glm::translate(glm::mat4(1.0f), glm::vec3(leftLocation.pose.position.x, leftLocation.pose.position.y, leftLocation.pose.position.z));
-            glm::mat4 leftRotation = glm::mat4_cast(-glm::quat(
-                leftLocation.pose.orientation.w,
-                leftLocation.pose.orientation.x,
-                leftLocation.pose.orientation.y,
-                leftLocation.pose.orientation.z));
+            glm::mat4 leftTranslation =
+                glm::translate(glm::mat4(1.0f), glm::vec3(leftLocation.pose.position.x, leftLocation.pose.position.y,
+                                                          leftLocation.pose.position.z));
+            glm::mat4 leftRotation =
+                glm::mat4_cast(-glm::quat(leftLocation.pose.orientation.w, leftLocation.pose.orientation.x,
+                                          leftLocation.pose.orientation.y, leftLocation.pose.orientation.z));
             models.at(2).uniform.model = glm::inverse(leftTranslation * leftRotation);
         }
         if (leftTriggerState.isActive && leftTriggerState.currentState)
@@ -655,22 +669,20 @@ struct App
         if (predictedDisplayTime != 0.0f)
         {
             rightLocation = xrSpace->locateSpace(*rightHandSpace, predictedDisplayTime, xrDispatchLoader);
-            glm::mat4 rightTranslation = glm::translate(glm::mat4(1.0f), glm::vec3(rightLocation.pose.position.x, rightLocation.pose.position.y, rightLocation.pose.position.z));
-            glm::mat4 rightRotation = glm::mat4_cast(-glm::quat(
-                rightLocation.pose.orientation.w,
-                rightLocation.pose.orientation.x,
-                rightLocation.pose.orientation.y,
-                rightLocation.pose.orientation.z));
+            glm::mat4 rightTranslation =
+                glm::translate(glm::mat4(1.0f), glm::vec3(rightLocation.pose.position.x, rightLocation.pose.position.y,
+                                                          rightLocation.pose.position.z));
+            glm::mat4 rightRotation =
+                glm::mat4_cast(-glm::quat(rightLocation.pose.orientation.w, rightLocation.pose.orientation.x,
+                                          rightLocation.pose.orientation.y, rightLocation.pose.orientation.z));
             models.at(3).uniform.model = glm::inverse(rightTranslation * rightRotation);
         }
         if (rightTriggerState.isActive && rightTriggerState.currentState)
         {
             if (rightLocation.locationFlags & xr::SpaceLocationFlagBits::PositionValid)
             {
-                glm::vec3 rightHandPosition{
-                    rightLocation.pose.position.x,
-                    rightLocation.pose.position.y,
-                    rightLocation.pose.position.z};
+                glm::vec3 rightHandPosition{rightLocation.pose.position.x, rightLocation.pose.position.y,
+                                            rightLocation.pose.position.z};
                 triggersPressed(glm::vec3(models.at(3).uniform.model[3]));
             }
         }
@@ -678,30 +690,32 @@ struct App
         xr::ActionStateGetInfo joystickActionStateInfo{};
         joystickActionStateInfo.action = *joystickAction;
         joystickActionStateInfo.subactionPath = leftHandPath;
-        xr::ActionStateVector2f leftJoystickState = xrSession->getActionStateVector2f(joystickActionStateInfo, xrDispatchLoader);
+        xr::ActionStateVector2f leftJoystickState =
+            xrSession->getActionStateVector2f(joystickActionStateInfo, xrDispatchLoader);
         joystickActionStateInfo.subactionPath = rightHandPath;
-        xr::ActionStateVector2f rightJoystickState = xrSession->getActionStateVector2f(joystickActionStateInfo, xrDispatchLoader);
-        if (leftJoystickState.isActive && (leftJoystickState.currentState.x != 0.0f || leftJoystickState.currentState.y != 0.0f))
+        xr::ActionStateVector2f rightJoystickState =
+            xrSession->getActionStateVector2f(joystickActionStateInfo, xrDispatchLoader);
+        if (leftJoystickState.isActive &&
+            (leftJoystickState.currentState.x != 0.0f || leftJoystickState.currentState.y != 0.0f))
         {
-            glm::vec2 leftJoystickPos{
-                leftJoystickState.currentState.x,
-                leftJoystickState.currentState.y};
+            glm::vec2 leftJoystickPos{leftJoystickState.currentState.x, leftJoystickState.currentState.y};
             joystickMoved(leftJoystickPos);
         }
-        if (rightJoystickState.isActive && (rightJoystickState.currentState.x != 0.0f || rightJoystickState.currentState.y != 0.0f))
+        if (rightJoystickState.isActive &&
+            (rightJoystickState.currentState.x != 0.0f || rightJoystickState.currentState.y != 0.0f))
         {
-            glm::vec2 rightJoystickPos{
-                rightJoystickState.currentState.x,
-                rightJoystickState.currentState.y};
+            glm::vec2 rightJoystickPos{rightJoystickState.currentState.x, rightJoystickState.currentState.y};
             joystickMoved(rightJoystickPos);
         }
 
         xr::ActionStateGetInfo faceButtonActionStateInfo{};
         faceButtonActionStateInfo.action = *faceButtonAction;
         faceButtonActionStateInfo.subactionPath = leftHandPath;
-        xr::ActionStateBoolean leftFaceButtonState = xrSession->getActionStateBoolean(faceButtonActionStateInfo, xrDispatchLoader);
+        xr::ActionStateBoolean leftFaceButtonState =
+            xrSession->getActionStateBoolean(faceButtonActionStateInfo, xrDispatchLoader);
         faceButtonActionStateInfo.subactionPath = rightHandPath;
-        xr::ActionStateBoolean rightFaceButtonState = xrSession->getActionStateBoolean(faceButtonActionStateInfo, xrDispatchLoader);
+        xr::ActionStateBoolean rightFaceButtonState =
+            xrSession->getActionStateBoolean(faceButtonActionStateInfo, xrDispatchLoader);
         if (leftFaceButtonState.isActive && leftFaceButtonState.currentState)
         {
             faceButtonPressed('X'); // Left hand binding mapped to "X"
@@ -757,7 +771,8 @@ struct App
         viewLocateInfo.displayTime = xrFrameState.predictedDisplayTime;
         viewLocateInfo.space = *xrSpace;
         xr::ViewState viewState{};
-        std::vector<xr::View> views = xrSession->locateViewsToVector(viewLocateInfo, reinterpret_cast<XrViewState *>(&viewState), xrDispatchLoader);
+        std::vector<xr::View> views = xrSession->locateViewsToVector(
+            viewLocateInfo, reinterpret_cast<XrViewState *>(&viewState), xrDispatchLoader);
 
         if (views.size() >= 2)
         {
@@ -772,20 +787,13 @@ struct App
                 float top = glm::tan(views[i].fov.angleUp) * nearZ;
                 glm::mat4 proj = glm::frustum(left, right, bottom, top, nearZ, farZ);
 
-                glm::mat4 clipConversion = glm::mat4(
-                    1.0f, 0.0f, 0.0f, 0.0f,
-                    0.0f, -1.0f, 0.0f, 0.0f,
-                    0.0f, 0.0f, 1.0f, 0.0f,
-                    0.0f, 0.0f, 0.0f, 1.0f);
+                glm::mat4 clipConversion = glm::mat4(1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+                                                     0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
 
                 proj = clipConversion * proj;
 
-                glm::vec3 pos(views[i].pose.position.x,
-                              views[i].pose.position.y,
-                              views[i].pose.position.z);
-                glm::quat orient(views[i].pose.orientation.w,
-                                 views[i].pose.orientation.x,
-                                 views[i].pose.orientation.y,
+                glm::vec3 pos(views[i].pose.position.x, views[i].pose.position.y, views[i].pose.position.z);
+                glm::quat orient(views[i].pose.orientation.w, views[i].pose.orientation.x, views[i].pose.orientation.y,
                                  views[i].pose.orientation.z);
 
                 glm::mat4 eyeMatrix = glm::translate(glm::mat4(1.0f), pos) * glm::mat4_cast(orient);
@@ -808,14 +816,13 @@ struct App
         {
             uint32_t xrImageIndex = xrSwapchain[eye]->acquireSwapchainImage(nullptr, xrDispatchLoader);
 
-            xr::SwapchainImageWaitInfo waitInfo{xr::Duration::infinite};
+            xr::SwapchainImageWaitInfo waitInfo{xr::Duration::infinite()};
             xrSwapchain[eye]->waitSwapchainImage(waitInfo, xrDispatchLoader);
 
             uint32_t eyeWidth = xrViewConfigurationViews.at(eye).recommendedImageRectWidth;
             uint32_t eyeHeight = xrViewConfigurationViews.at(eye).recommendedImageRectHeight;
 
-            pbrMaterial->updateDescriptorBufferInfo(0, 2, *xrCameras[eye]->buffer, 0,
-                                                    sizeof(letc::Camera::Uniform));
+            pbrMaterial->updateDescriptorBufferInfo(0, 2, *xrCameras[eye]->buffer, 0, sizeof(letc::Camera::Uniform));
             pbrMaterial->updateDescriptorSet(0);
 
             pointsRenderer->material->updateDescriptorBufferInfo(0, 0, *xrCameras[eye]->buffer, 0,
@@ -839,8 +846,7 @@ struct App
             colorBarrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
             colorBarrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
             colorBarrier.setImage(xrSwapchainImageVk[eye][xrImageIndex].image);
-            colorBarrier.setSubresourceRange(vk::ImageSubresourceRange{
-                vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+            colorBarrier.setSubresourceRange(vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
 
             vk::ImageMemoryBarrier depthBarrier{};
             depthBarrier.setSrcAccessMask(vk::AccessFlags{});
@@ -851,15 +857,14 @@ struct App
             depthBarrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
             depthBarrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
             depthBarrier.setImage(xrDepthBuffer->m_gpuImage);
-            depthBarrier.setSubresourceRange(vk::ImageSubresourceRange{
-                vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1});
+            depthBarrier.setSubresourceRange(vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1});
 
             commandBuffer->pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-                                           vk::PipelineStageFlagBits::eEarlyFragmentTests,
-                                           {}, 0, nullptr, 0, nullptr, 1, &depthBarrier);
+                                           vk::PipelineStageFlagBits::eEarlyFragmentTests, {}, 0, nullptr, 0, nullptr,
+                                           1, &depthBarrier);
             commandBuffer->pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-                                           vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                                           {}, 0, nullptr, 0, nullptr, 1, &colorBarrier);
+                                           vk::PipelineStageFlagBits::eColorAttachmentOutput, {}, 0, nullptr, 0,
+                                           nullptr, 1, &colorBarrier);
 
             vk::RenderingInfo renderingInfo{};
             renderingInfo.setRenderArea({{0, 0}, {eyeWidth, eyeHeight}});
@@ -910,19 +915,19 @@ struct App
             presentBarrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
             presentBarrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
             presentBarrier.setImage(xrSwapchainImageVk[eye][xrImageIndex].image);
-            presentBarrier.setSubresourceRange(vk::ImageSubresourceRange{
-                vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+            presentBarrier.setSubresourceRange(vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
 
             commandBuffer->pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                                           vk::PipelineStageFlagBits::eBottomOfPipe,
-                                           {}, 0, nullptr, 0, nullptr, 1, &presentBarrier);
+                                           vk::PipelineStageFlagBits::eBottomOfPipe, {}, 0, nullptr, 0, nullptr, 1,
+                                           &presentBarrier);
 
             commandBuffer->end();
 
             vk::Fence commandFence = commandFences.at(eye).get();
             assertThrow(device->device.resetFences(1, &commandFence) == vk::Result::eSuccess,
                         "failed to reset command fence");
-            queue.submit(vk::SubmitInfo{}.setCommandBufferCount(1).setPCommandBuffers(&commandBuffer.get()), commandFence);
+            queue.submit(vk::SubmitInfo{}.setCommandBufferCount(1).setPCommandBuffers(&commandBuffer.get()),
+                         commandFence);
             assertThrow(device->device.waitForFences(1, &commandFence, VK_TRUE, 5000000000) == vk::Result::eSuccess,
                         "failed to wait for command fence");
 
@@ -932,7 +937,8 @@ struct App
             projectionViews[eye].pose = views[eye].pose;
             projectionViews[eye].fov = views[eye].fov;
             projectionViews[eye].subImage.swapchain = xrSwapchain[eye].get();
-            projectionViews[eye].subImage.imageRect = xr::Rect2Di{xr::Offset2Di{0, 0}, xr::Extent2Di{static_cast<int32_t>(eyeWidth), static_cast<int32_t>(eyeHeight)}};
+            projectionViews[eye].subImage.imageRect = xr::Rect2Di{
+                xr::Offset2Di{0, 0}, xr::Extent2Di{static_cast<int32_t>(eyeWidth), static_cast<int32_t>(eyeHeight)}};
             projectionViews[eye].subImage.imageArrayIndex = 0;
         }
 
@@ -959,8 +965,7 @@ struct App
         assertThrow(result == vk::Result::eSuccess, "failed to acquire next image: " + vk::to_string(result));
         m_currentImageIndex = imageIndex;
 
-        pbrMaterial->updateDescriptorBufferInfo(0, 2, *camera->buffer, 0,
-                                                sizeof(letc::Camera::Uniform));
+        pbrMaterial->updateDescriptorBufferInfo(0, 2, *camera->buffer, 0, sizeof(letc::Camera::Uniform));
         pbrMaterial->updateDescriptorSet(0);
 
         vk::UniqueCommandBuffer &commandBuffer = commandBuffers.at(2);
@@ -1080,8 +1085,7 @@ struct App
         assertThrow(device->device.resetFences(1, &commandFence) == vk::Result::eSuccess,
                     "failed to reset command fence");
 
-        queue.submit(vk::SubmitInfo{}.setCommandBufferCount(1).setPCommandBuffers(&commandBuffer.get()),
-                     commandFence);
+        queue.submit(vk::SubmitInfo{}.setCommandBufferCount(1).setPCommandBuffers(&commandBuffer.get()), commandFence);
 
         assertThrow(device->device.waitForFences(1, &commandFence, VK_TRUE, 5000000000) == vk::Result::eSuccess,
                     "failed to wait for command fence");
