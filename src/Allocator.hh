@@ -1,6 +1,5 @@
 #pragma once
 
-#include <vulkan/vulkan_structs.hpp>
 #ifndef LETC_ALLOCATOR_HH
 #define LETC_ALLOCATOR_HH
 

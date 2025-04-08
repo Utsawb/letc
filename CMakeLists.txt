@@ -72,6 +72,14 @@ set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "Build Assimp tools" FORCE)
 FetchContent_MakeAvailable(assimp)
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE assimp::assimp)
 
+FetchContent_Declare(
+  Eigen3
+  GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
+  GIT_TAG        3.4.0
+)
+FetchContent_MakeAvailable(Eigen3)
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Eigen3::Eigen)
+
 target_precompile_headers(${CMAKE_PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/pch.hh")
 
 set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES CXX_STANDARD 26)

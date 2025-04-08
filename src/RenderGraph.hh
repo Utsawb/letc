@@ -5,12 +5,12 @@
 
 namespace letc
 {
+	
+
 	struct RenderGraph
 	{
 
 	};
-
-
 }; // namespace letc
 
 #endif // LETC_RENDERGRAPH_HH

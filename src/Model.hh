@@ -1,12 +1,14 @@
 #pragma once
 
+#ifndef LETC_MODEL_HH
+#define LETC_MODEL_HH
+
 #include "Allocator.hh"
 #include "assimp/mesh.h"
 #include <iostream>
 #include <memory>
 #include <vulkan/vulkan.hpp>
-#ifndef LETC_MODEL_HH
-#define LETC_MODEL_HH
+
 
 #include "pch.hh"
 
@@ -138,6 +140,8 @@ namespace letc
 
         void cpyAttributes()
         {
+            uniform.modelInvTranspose = glm::transpose(glm::inverse(uniform.model));
+
             if (indexBuffer)
             {
                 indexBuffer->cpy(index.data(), index.size() * sizeof(unsigned));

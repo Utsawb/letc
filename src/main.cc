@@ -11,6 +11,7 @@
 #include "Pipeline.hh"
 #include "Swapchain.hh"
 #include "Window.hh"
+#include "Points.hh"
 
 std::filesystem::path resourcePath = "../../resources/";
 
@@ -43,6 +44,18 @@ struct App
 
     xr::UniqueDynamicSession xrSession;
     xr::UniqueDynamicSwapchain xrSwapchain[2];
+
+    xr::Time xrPredictedDisplayTime = xr::Time{};
+    xr::UniqueDynamicSpace leftHandSpace;
+    xr::UniqueDynamicSpace rightHandSpace;
+    xr::Path leftHandPath;
+    xr::Path rightHandPath;
+    xr::UniqueDynamicActionSet actionSet;
+    xr::UniqueDynamicAction triggerAction;
+    xr::UniqueDynamicAction joystickAction;
+    xr::UniqueDynamicAction faceButtonAction;
+    xr::UniqueDynamicAction handPoseAction;
+
     std::vector<xr::ViewConfigurationView> xrViewConfigurationViews;
     xr::UniqueDynamicSpace xrSpace;
     long long xrSwapchainFormat;
@@ -73,6 +86,9 @@ struct App
     std::unique_ptr<letc::DescriptorLayout> pbrLayout;
     std::unique_ptr<letc::Material> pbrMaterial;
     std::unique_ptr<letc::GraphicsPipeline> pbrPipeline;
+
+    std::unique_ptr<letc::Points> points;
+    std::unique_ptr<letc::PointsRenderer> pointsRenderer;
 
     std::unique_ptr<letc::ImageBuffer<float>> depthBuffer;
     vk::UniqueImageView depthImageView;
@@ -135,7 +151,7 @@ struct App
         // window and vulkan initialization
         vkfw::WindowHints windowHints{};
         window = vkfw::createWindowUnique(letc::WindowBuilder{});
-        instance = std::make_unique<letc::Instance>(letc::InstanceBuilder{}.setDebug(false).addInstanceExtension("VK_KHR_external_memory_capabilities").addInstanceExtension("VK_KHR_get_physical_device_properties2"));
+        instance = std::make_unique<letc::Instance>(letc::InstanceBuilder{}.setDebug(true).addInstanceExtension("VK_KHR_external_memory_capabilities").addInstanceExtension("VK_KHR_get_physical_device_properties2"));
         VULKAN_HPP_DEFAULT_DISPATCHER.init(instance->instance);
 
         // window surface creation
@@ -170,6 +186,100 @@ struct App
         xrSessionInfo.systemId = xrSystemId;
         xrSession = xrInstance->createSessionUnique(xrSessionInfo, xrDispatchLoader);
 
+        {
+            leftHandPath = xrInstance->stringToPath("/user/hand/left", xrDispatchLoader);
+            rightHandPath = xrInstance->stringToPath("/user/hand/right", xrDispatchLoader);
+
+            // Create an action set.
+            xr::ActionSetCreateInfo actionSetInfo{};
+            std::strcpy(actionSetInfo.actionSetName, "gameplay");
+            std::strcpy(actionSetInfo.localizedActionSetName, "Gameplay");
+            actionSetInfo.priority = 0;
+            actionSet = xrInstance->createActionSetUnique(actionSetInfo, xrDispatchLoader);
+
+            // Create subaction paths for left and right hands.
+            xr::Path leftHandPath = xrInstance->stringToPath("/user/hand/left", xrDispatchLoader);
+            xr::Path rightHandPath = xrInstance->stringToPath("/user/hand/right", xrDispatchLoader);
+            std::vector<xr::Path> subactionPaths = {leftHandPath, rightHandPath};
+
+            // Create the trigger action (boolean input).
+            xr::ActionCreateInfo triggerActionInfo{};
+            std::strcpy(triggerActionInfo.actionName, "trigger_press");
+            std::strcpy(triggerActionInfo.localizedActionName, "Trigger Press");
+            triggerActionInfo.actionType = xr::ActionType::BooleanInput;
+            triggerActionInfo.countSubactionPaths = static_cast<uint32_t>(subactionPaths.size());
+            triggerActionInfo.subactionPaths = subactionPaths.data();
+            triggerAction = actionSet->createActionUnique(triggerActionInfo, xrDispatchLoader);
+
+            // Create the joystick action (vector2f input).
+            xr::ActionCreateInfo joystickActionInfo{};
+            std::strcpy(joystickActionInfo.actionName, "joystick_move");
+            std::strcpy(joystickActionInfo.localizedActionName, "Joystick Move");
+            joystickActionInfo.actionType = xr::ActionType::Vector2FInput;
+            joystickActionInfo.countSubactionPaths = static_cast<uint32_t>(subactionPaths.size());
+            joystickActionInfo.subactionPaths = subactionPaths.data();
+            joystickAction = actionSet->createActionUnique(joystickActionInfo, xrDispatchLoader);
+
+            // Create the face button action (boolean input).
+            xr::ActionCreateInfo faceButtonActionInfo{};
+            std::strcpy(faceButtonActionInfo.actionName, "face_button_press");
+            std::strcpy(faceButtonActionInfo.localizedActionName, "Face Button Press");
+            faceButtonActionInfo.actionType = xr::ActionType::BooleanInput;
+            faceButtonActionInfo.countSubactionPaths = static_cast<uint32_t>(subactionPaths.size());
+            faceButtonActionInfo.subactionPaths = subactionPaths.data();
+            faceButtonAction = actionSet->createActionUnique(faceButtonActionInfo, xrDispatchLoader);
+
+            // Create a pose action to capture hand position data.
+            xr::ActionCreateInfo handPoseActionInfo{};
+            std::strcpy(handPoseActionInfo.actionName, "hand_pose");
+            std::strcpy(handPoseActionInfo.localizedActionName, "Hand Pose");
+            handPoseActionInfo.actionType = xr::ActionType::PoseInput;
+            handPoseActionInfo.countSubactionPaths = static_cast<uint32_t>(subactionPaths.size());
+            handPoseActionInfo.subactionPaths = subactionPaths.data();
+            handPoseAction = actionSet->createActionUnique(handPoseActionInfo, xrDispatchLoader);
+
+            // Suggest bindings for a common controller profile (example: Oculus Touch).
+            xr::Path oculusTouchInteractionProfile = xrInstance->stringToPath("/interaction_profiles/oculus/touch_controller", xrDispatchLoader);
+            std::vector<xr::ActionSuggestedBinding> bindings;
+            bindings.push_back({*triggerAction, xrInstance->stringToPath("/user/hand/left/input/trigger", xrDispatchLoader)});
+            bindings.push_back({*triggerAction, xrInstance->stringToPath("/user/hand/right/input/trigger", xrDispatchLoader)});
+            bindings.push_back({*joystickAction, xrInstance->stringToPath("/user/hand/left/input/thumbstick", xrDispatchLoader)});
+            bindings.push_back({*joystickAction, xrInstance->stringToPath("/user/hand/right/input/thumbstick", xrDispatchLoader)});
+            bindings.push_back({*faceButtonAction, xrInstance->stringToPath("/user/hand/left/input/x", xrDispatchLoader)});
+            bindings.push_back({*faceButtonAction, xrInstance->stringToPath("/user/hand/right/input/a", xrDispatchLoader)});
+            bindings.push_back({*handPoseAction, xrInstance->stringToPath("/user/hand/left/input/aim/pose", xrDispatchLoader)});
+            bindings.push_back({*handPoseAction, xrInstance->stringToPath("/user/hand/right/input/aim/pose", xrDispatchLoader)});
+
+            xr::InteractionProfileSuggestedBinding suggestedBinding{};
+            suggestedBinding.interactionProfile = oculusTouchInteractionProfile;
+            suggestedBinding.suggestedBindings = bindings.data();
+            suggestedBinding.countSuggestedBindings = static_cast<uint32_t>(bindings.size());
+            xrInstance->suggestInteractionProfileBindings(suggestedBinding, xrDispatchLoader);
+
+            {
+                xr::ActionSpaceCreateInfo actionSpaceInfo{};
+                actionSpaceInfo.action = *handPoseAction;
+                // Use an identity pose for the action space (adjust if you need an offset).
+                actionSpaceInfo.poseInActionSpace.orientation = xr::Quaternionf{0, 0, 0, 1};
+                actionSpaceInfo.poseInActionSpace.position = xr::Vector3f{0, 0, 0};
+
+                // Create left hand action space.
+                actionSpaceInfo.subactionPath = leftHandPath;
+                leftHandSpace = xrSession->createActionSpaceUnique(actionSpaceInfo, xrDispatchLoader);
+
+                // Create right hand action space.
+                actionSpaceInfo.subactionPath = rightHandPath;
+                rightHandSpace = xrSession->createActionSpaceUnique(actionSpaceInfo, xrDispatchLoader);
+            }
+
+            // Attach the action set to the session.
+            xr::SessionActionSetsAttachInfo attachInfo{};
+            std::vector<xr::ActionSet> actionSets = {actionSet->get()};
+            attachInfo.countActionSets = static_cast<uint32_t>(actionSets.size());
+            attachInfo.actionSets = actionSets.data();
+            xrSession->attachSessionActionSets(attachInfo);
+        }
+
         auto xrViewConfig = xrInstance->enumerateViewConfigurationsToVector(xrSystemId, xrDispatchLoader);
         auto stereo = std::find_if(xrViewConfig.begin(), xrViewConfig.end(), [](xr::ViewConfigurationType &vc)
                                    { return vc == xr::ViewConfigurationType::PrimaryStereo; });
@@ -180,7 +290,7 @@ struct App
         xr::ReferenceSpaceCreateInfo xrSpaceInfo{};
         xrSpaceInfo.next = nullptr;
         xrSpaceInfo.referenceSpaceType = xr::ReferenceSpaceType::Stage;
-        xrSpaceInfo.poseInReferenceSpace = xr::Posef{};
+        xrSpaceInfo.poseInReferenceSpace = xr::Posef{{0, 0, 0, 1}, {0, 0, 0}};
         xrSpace = xrSession->createReferenceSpaceUnique(xrSpaceInfo, xrDispatchLoader);
 
         auto xrSwapchainFormat = xrSession->enumerateSwapchainFormatsToVector(xrDispatchLoader);
@@ -267,18 +377,12 @@ struct App
         globalUniformsBuffer = std::make_unique<letc::Buffer>(
             *allocator, sizeof(GlobalUniforms), vk::BufferUsageFlagBits::eUniformBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-        float s = 20.0f;
-        float h = -10.0f; // height above the origin
-        lights.push_back({{-s, h, -s, 1.0f}, {0.5f, 0.0f, 0.0f, 1.0f}});
-        lights.push_back({{-s, h, s, 1.0f}, {0.0f, 0.5f, 0.0f, 1.0f}});
-        lights.push_back({{s, h, s, 1.0f}, {0.0f, 0.0f, 0.5f, 1.0f}});
-        lights.push_back({{s, h, -s, 1.0f}, {0.5f, 0.5f, 0.5f, 1.0f}});
-
-        h *= -1.0f;
-        lights.push_back({{-s, h, -s, 1.0f}, {0.5f, 0.0f, 0.0f, 1.0f}});
-        lights.push_back({{-s, h, s, 1.0f}, {0.0f, 0.5f, 0.0f, 1.0f}});
-        lights.push_back({{s, h, s, 1.0f}, {0.0f, 0.0f, 0.5f, 1.0f}});
-        lights.push_back({{s, h, -s, 1.0f}, {0.5f, 0.5f, 0.5f, 1.0f}});
+        float s = 4.0f;
+        float h = 2.0f; // height above the origin
+        lights.push_back({{-s, h, -s, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f}});
+        lights.push_back({{-s, h, s, 1.0f}, {0.0f, 1.0f, 0.0f, 1.0f}});
+        lights.push_back({{s, h, s, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}});
+        lights.push_back({{s, h, -s, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}});
 
         lightsBuffer =
             std::make_unique<letc::Buffer>(*allocator, sizeof(Light) * lights.size(),
@@ -298,7 +402,9 @@ struct App
         }
 
         models.emplace_back(*allocator, resourcePath / "Avocado.glb");
-        models.emplace_back(*allocator, resourcePath / "platform.glb");
+        models.emplace_back(*allocator, resourcePath / "pointy.glb");
+        models.emplace_back(*allocator, resourcePath / "Avocado.glb");
+        models.emplace_back(*allocator, resourcePath / "Avocado.glb");
         models.emplace_back(*allocator, resourcePath / "Avocado.glb");
         models.emplace_back(*allocator, resourcePath / "Avocado.glb");
 
@@ -352,6 +458,14 @@ struct App
         gpb.renderingInfo.setPColorAttachmentFormats(&swapchain->format.format);
         gpb.setRasterization(gpb.rasterizationInfo.setCullMode(vk::CullModeFlagBits::eNone));
         pbrPipeline = std::make_unique<letc::GraphicsPipeline>(*device, gpb);
+
+        points = std::make_unique<letc::Points>(*allocator);
+        pointsRenderer = std::make_unique<letc::PointsRenderer>(
+            *allocator,
+            *device,
+            *swapchain,
+            readFile(resourcePath / "points.vert.spv"),
+            readFile(resourcePath / "points.frag.spv"));
 
         // depth buffer initialization
         depthBuffer = std::make_unique<letc::ImageBuffer<float>>(
@@ -418,6 +532,54 @@ struct App
         xrSession->beginSession(beginInfo, xrDispatchLoader);
     }
 
+    void triggersPressed(const glm::vec3 &handPosition)
+    {
+        std::cout << "Trigger pressed! Hand position: ("
+                  << handPosition.x << ", " << handPosition.y << ", " << handPosition.z << ")\n";
+        points->points.push_back(handPosition);
+    }
+
+    void joystickMoved(const glm::vec2 &joystickPosition)
+    {
+        std::cout << "Joystick moved! Position: ("
+                  << joystickPosition.x << ", " << joystickPosition.y << ")\n";
+    }
+
+    const std::chrono::duration<long long, std::milli> BUTTON_DEBOUNCE_TIME = std::chrono::milliseconds(100);
+    std::chrono::time_point<std::chrono::steady_clock> lastButtonPressTime;
+    char lastButtonPressed = '\0';
+    void faceButtonPressed(const char button)
+    {
+        auto now = std::chrono::steady_clock::now();
+        if (now - lastButtonPressTime >= BUTTON_DEBOUNCE_TIME || button != lastButtonPressed)
+        {
+            switch (button)
+            {
+            case 'A':
+                std::cout << "Face button A pressed." << std::endl;
+                // TODO: Add functionality for button A
+                break;
+            case 'X':
+                std::cout << "Face button X pressed." << std::endl;
+                // TODO: Add functionality for button X
+                break;
+            case 'Y':
+                std::cout << "Face button Y pressed." << std::endl;
+                // TODO: Add functionality for button Y
+                break;
+            case 'B':
+                std::cout << "Face button B pressed." << std::endl;
+                // TODO: Add functionality for button B
+                break;
+            default:
+                std::cout << "Unknown face button pressed: " << button << std::endl;
+                break;
+            }
+            lastButtonPressTime = now;
+            lastButtonPressed = button;
+        }
+    }
+
     void updateLogic()
     {
         vkfw::pollEvents();
@@ -454,9 +616,105 @@ struct App
             lights[i].position.z = 2.0f * sin(angle);
         }
 
+        // --- Query OpenXR action states ---
+        XrActionsSyncInfo syncInfo{XR_TYPE_ACTIONS_SYNC_INFO};
+        XrActiveActionSet activeActionSet{actionSet->get(), XR_NULL_PATH};
+        syncInfo.countActiveActionSets = 1;
+        syncInfo.activeActionSets = &activeActionSet;
+        xrSyncActions(xrSession->get(), &syncInfo);
+
+        xr::Time predictedDisplayTime = xrPredictedDisplayTime;
+
+        xr::ActionStateGetInfo triggerActionStateInfo{};
+        triggerActionStateInfo.action = *triggerAction;
+        triggerActionStateInfo.subactionPath = leftHandPath;
+        xr::ActionStateBoolean leftTriggerState = xrSession->getActionStateBoolean(triggerActionStateInfo, xrDispatchLoader);
+        triggerActionStateInfo.subactionPath = rightHandPath;
+        xr::ActionStateBoolean rightTriggerState = xrSession->getActionStateBoolean(triggerActionStateInfo, xrDispatchLoader);
+
+        xr::SpaceLocation leftLocation;
+        if (predictedDisplayTime != 0.0f)
+        {
+            leftLocation = xrSpace->locateSpace(*leftHandSpace, predictedDisplayTime, xrDispatchLoader);
+            glm::mat4 leftTranslation = glm::translate(glm::mat4(1.0f), glm::vec3(leftLocation.pose.position.x, leftLocation.pose.position.y, leftLocation.pose.position.z));
+            glm::mat4 leftRotation = glm::mat4_cast(-glm::quat(
+                leftLocation.pose.orientation.w,
+                leftLocation.pose.orientation.x,
+                leftLocation.pose.orientation.y,
+                leftLocation.pose.orientation.z));
+            models.at(2).uniform.model = glm::inverse(leftTranslation * leftRotation);
+        }
+        if (leftTriggerState.isActive && leftTriggerState.currentState)
+        {
+            if (leftLocation.locationFlags & xr::SpaceLocationFlagBits::PositionValid)
+            {
+                triggersPressed(glm::vec3(models.at(2).uniform.model[3]));
+            }
+        }
+        xr::SpaceLocation rightLocation;
+        if (predictedDisplayTime != 0.0f)
+        {
+            rightLocation = xrSpace->locateSpace(*rightHandSpace, predictedDisplayTime, xrDispatchLoader);
+            glm::mat4 rightTranslation = glm::translate(glm::mat4(1.0f), glm::vec3(rightLocation.pose.position.x, rightLocation.pose.position.y, rightLocation.pose.position.z));
+            glm::mat4 rightRotation = glm::mat4_cast(-glm::quat(
+                rightLocation.pose.orientation.w,
+                rightLocation.pose.orientation.x,
+                rightLocation.pose.orientation.y,
+                rightLocation.pose.orientation.z));
+            models.at(3).uniform.model = glm::inverse(rightTranslation * rightRotation);
+        }
+        if (rightTriggerState.isActive && rightTriggerState.currentState)
+        {
+            if (rightLocation.locationFlags & xr::SpaceLocationFlagBits::PositionValid)
+            {
+                glm::vec3 rightHandPosition{
+                    rightLocation.pose.position.x,
+                    rightLocation.pose.position.y,
+                    rightLocation.pose.position.z};
+                triggersPressed(glm::vec3(models.at(3).uniform.model[3]));
+            }
+        }
+
+        xr::ActionStateGetInfo joystickActionStateInfo{};
+        joystickActionStateInfo.action = *joystickAction;
+        joystickActionStateInfo.subactionPath = leftHandPath;
+        xr::ActionStateVector2f leftJoystickState = xrSession->getActionStateVector2f(joystickActionStateInfo, xrDispatchLoader);
+        joystickActionStateInfo.subactionPath = rightHandPath;
+        xr::ActionStateVector2f rightJoystickState = xrSession->getActionStateVector2f(joystickActionStateInfo, xrDispatchLoader);
+        if (leftJoystickState.isActive && (leftJoystickState.currentState.x != 0.0f || leftJoystickState.currentState.y != 0.0f))
+        {
+            glm::vec2 leftJoystickPos{
+                leftJoystickState.currentState.x,
+                leftJoystickState.currentState.y};
+            joystickMoved(leftJoystickPos);
+        }
+        if (rightJoystickState.isActive && (rightJoystickState.currentState.x != 0.0f || rightJoystickState.currentState.y != 0.0f))
+        {
+            glm::vec2 rightJoystickPos{
+                rightJoystickState.currentState.x,
+                rightJoystickState.currentState.y};
+            joystickMoved(rightJoystickPos);
+        }
+
+        xr::ActionStateGetInfo faceButtonActionStateInfo{};
+        faceButtonActionStateInfo.action = *faceButtonAction;
+        faceButtonActionStateInfo.subactionPath = leftHandPath;
+        xr::ActionStateBoolean leftFaceButtonState = xrSession->getActionStateBoolean(faceButtonActionStateInfo, xrDispatchLoader);
+        faceButtonActionStateInfo.subactionPath = rightHandPath;
+        xr::ActionStateBoolean rightFaceButtonState = xrSession->getActionStateBoolean(faceButtonActionStateInfo, xrDispatchLoader);
+        if (leftFaceButtonState.isActive && leftFaceButtonState.currentState)
+        {
+            faceButtonPressed('X'); // Left hand binding mapped to "X"
+        }
+        if (rightFaceButtonState.isActive && rightFaceButtonState.currentState)
+        {
+            faceButtonPressed('A'); // Right hand binding mapped to "A"
+        }
+
         for (size_t i = 0; i < models.size(); ++i)
         {
             modelUniforms[i].model = models[i].uniform.model;
+            modelUniforms[i].modelInvTranspose = glm::transpose(glm::inverse(models[i].uniform.model));
         }
     }
 
@@ -467,12 +725,15 @@ struct App
         camera->cpy();
         modelUniformsBuffer->cpy(modelUniforms.data(), sizeof(letc::Model::UniformBuffer) * models.size());
         pbrMaterial->updateDescriptorSets();
+
+        points->cpy();
     }
 
     void xrFrame()
     {
         // Wait for the next XR frame
         xr::FrameState xrFrameState = xrSession->waitFrame(nullptr, xrDispatchLoader);
+        xrPredictedDisplayTime = xrFrameState.predictedDisplayTime;
 
         if (!xrFrameState.shouldRender)
         {
@@ -488,11 +749,8 @@ struct App
             return;
         }
 
-        // Begin the XR frame
         xrSession->beginFrame(nullptr, xrDispatchLoader);
 
-        // --- Locate views for both eyes ---
-        // Assuming xrViewConfigViews was obtained earlier (e.g., during initialization)
         const uint32_t viewCount = 2;
         xr::ViewLocateInfo viewLocateInfo{};
         viewLocateInfo.viewConfigurationType = xr::ViewConfigurationType::PrimaryStereo;
@@ -522,7 +780,6 @@ struct App
 
                 proj = clipConversion * proj;
 
-                // Extract position and orientation from the current view.
                 glm::vec3 pos(views[i].pose.position.x,
                               views[i].pose.position.y,
                               views[i].pose.position.z);
@@ -531,60 +788,49 @@ struct App
                                  views[i].pose.orientation.y,
                                  views[i].pose.orientation.z);
 
-                // Build the eye's transform and compute its view matrix.
                 glm::mat4 eyeMatrix = glm::translate(glm::mat4(1.0f), pos) * glm::mat4_cast(orient);
                 glm::mat4 viewMatrix = glm::inverse(eyeMatrix);
 
-                // Update camera uniforms.
                 xrCameras.at(i)->uniform.view = viewMatrix;
                 xrCameras.at(i)->uniform.proj = proj;
                 xrCameras.at(i)->cpy();
 
-                // Update corresponding model uniforms.
-                // Assumes index 2 is for the left eye and index 3 for the right eye.
-                modelUniforms.at(i + 2).model = eyeMatrix;
+                modelUniforms.at(i + 4).model = eyeMatrix;
             }
 
             modelUniformsBuffer->cpy(modelUniforms.data(), sizeof(letc::Model::UniformBuffer) * models.size());
             pbrMaterial->updateDescriptorSet(0);
         }
 
-        // Vector to hold the projection views (one per eye)
         std::vector<xr::CompositionLayerProjectionView> projectionViews(viewCount);
 
-        // --- Render for each eye ---
         for (uint32_t eye = 0; eye < viewCount; ++eye)
         {
-            // Acquire the next image from the XR swapchain for this eye
             uint32_t xrImageIndex = xrSwapchain[eye]->acquireSwapchainImage(nullptr, xrDispatchLoader);
 
-            // Wait for the acquired image
             xr::SwapchainImageWaitInfo waitInfo{xr::Duration::infinite};
             xrSwapchain[eye]->waitSwapchainImage(waitInfo, xrDispatchLoader);
 
-            // Retrieve the recommended width and height for this eye's view.
-            // (Assuming xrViewConfigViews is a vector obtained during initialization)
             uint32_t eyeWidth = xrViewConfigurationViews.at(eye).recommendedImageRectWidth;
             uint32_t eyeHeight = xrViewConfigurationViews.at(eye).recommendedImageRectHeight;
 
-            // update the camera descriptor set for this eye
             pbrMaterial->updateDescriptorBufferInfo(0, 2, *xrCameras[eye]->buffer, 0,
                                                     sizeof(letc::Camera::Uniform));
             pbrMaterial->updateDescriptorSet(0);
 
-            // --- Record command buffer for this eye ---
-            // We reuse commandBuffers[2] here (resetting it for each eye).
+            pointsRenderer->material->updateDescriptorBufferInfo(0, 0, *xrCameras[eye]->buffer, 0,
+                                                                 sizeof(letc::Camera::Uniform));
+            pointsRenderer->material->updateDescriptorSet(0);
+
             vk::UniqueCommandBuffer &commandBuffer = commandBuffers.at(2);
             commandBuffer->reset(vk::CommandBufferResetFlagBits::eReleaseResources);
             commandBuffer->begin(vk::CommandBufferBeginInfo{}.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
-            // Set viewport and scissor to cover the entire swapchain image for this eye
             vk::Rect2D scissor({0, 0}, {eyeWidth, eyeHeight});
             commandBuffer->setScissor(0, 1, &scissor);
             vk::Viewport viewport(0.0f, 0.0f, static_cast<float>(eyeWidth), static_cast<float>(eyeHeight), 0.0f, 1.0f);
             commandBuffer->setViewport(0, 1, &viewport);
 
-            // Prepare an image memory barrier for transitioning the swapchain image
             vk::ImageMemoryBarrier colorBarrier{};
             colorBarrier.setSrcAccessMask(vk::AccessFlags{});
             colorBarrier.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
@@ -596,7 +842,6 @@ struct App
             colorBarrier.setSubresourceRange(vk::ImageSubresourceRange{
                 vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
 
-            // Similarly, prepare the depth buffer barrier (using your depthBuffer)
             vk::ImageMemoryBarrier depthBarrier{};
             depthBarrier.setSrcAccessMask(vk::AccessFlags{});
             depthBarrier.setDstAccessMask(vk::AccessFlagBits::eDepthStencilAttachmentRead |
@@ -616,7 +861,6 @@ struct App
                                            vk::PipelineStageFlagBits::eColorAttachmentOutput,
                                            {}, 0, nullptr, 0, nullptr, 1, &colorBarrier);
 
-            // Begin rendering into the swapchain image for this eye
             vk::RenderingInfo renderingInfo{};
             renderingInfo.setRenderArea({{0, 0}, {eyeWidth, eyeHeight}});
             renderingInfo.setLayerCount(1);
@@ -642,10 +886,9 @@ struct App
 
             commandBuffer->beginRendering(renderingInfo);
 
-            // Bind your pipeline and material and render the models.
             pbrPipeline->bind(commandBuffer.get());
             pbrMaterial->bind(commandBuffer.get(), *pbrPipeline);
-            for (uint32_t i = 0; i < 2; ++i)
+            for (uint32_t i = 0; i < 4; ++i)
             {
                 uint32_t dynamicOffset = i * sizeof(letc::Model::UniformBuffer);
                 pbrMaterial->updateDynamicOffset(1, dynamicOffset);
@@ -653,15 +896,16 @@ struct App
                 models[i].draw(*commandBuffer);
             }
 
+            pointsRenderer->pipeline->bind(commandBuffer.get());
+            pointsRenderer->material->bind(commandBuffer.get(), *pointsRenderer->pipeline);
+            points->draw(*commandBuffer);
+
             commandBuffer->endRendering();
 
-            // Transition the image for reading if necessary.
             vk::ImageMemoryBarrier presentBarrier{};
             presentBarrier.setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
             presentBarrier.setDstAccessMask(vk::AccessFlagBits::eMemoryRead);
             presentBarrier.setOldLayout(vk::ImageLayout::eColorAttachmentOptimal);
-            // For XR, the image is not “presented” the same way as the flat swapchain.
-            // You might keep it in the same layout or transition as needed.
             presentBarrier.setNewLayout(vk::ImageLayout::eColorAttachmentOptimal);
             presentBarrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
             presentBarrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
@@ -675,7 +919,6 @@ struct App
 
             commandBuffer->end();
 
-            // Submit the command buffer and wait for execution to finish
             vk::Fence commandFence = commandFences.at(eye).get();
             assertThrow(device->device.resetFences(1, &commandFence) == vk::Result::eSuccess,
                         "failed to reset command fence");
@@ -683,11 +926,9 @@ struct App
             assertThrow(device->device.waitForFences(1, &commandFence, VK_TRUE, 5000000000) == vk::Result::eSuccess,
                         "failed to wait for command fence");
 
-            // Release the XR swapchain image
             xr::SwapchainImageReleaseInfo releaseInfo{};
             xrSwapchain[eye]->releaseSwapchainImage(nullptr, xrDispatchLoader);
 
-            // Fill in the projection view for this eye
             projectionViews[eye].pose = views[eye].pose;
             projectionViews[eye].fov = views[eye].fov;
             projectionViews[eye].subImage.swapchain = xrSwapchain[eye].get();
@@ -695,7 +936,6 @@ struct App
             projectionViews[eye].subImage.imageArrayIndex = 0;
         }
 
-        // --- End the frame by submitting the projection layer ---
         xr::CompositionLayerProjection projectionLayer{};
         projectionLayer.space = *xrSpace;
         projectionLayer.viewCount = static_cast<uint32_t>(projectionViews.size());
@@ -719,7 +959,6 @@ struct App
         assertThrow(result == vk::Result::eSuccess, "failed to acquire next image: " + vk::to_string(result));
         m_currentImageIndex = imageIndex;
 
-        // update the camera descriptor set
         pbrMaterial->updateDescriptorBufferInfo(0, 2, *camera->buffer, 0,
                                                 sizeof(letc::Camera::Uniform));
         pbrMaterial->updateDescriptorSet(0);
