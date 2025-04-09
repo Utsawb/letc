@@ -13,7 +13,7 @@
 #include "Swapchain.hh"
 #include "Window.hh"
 
-std::filesystem::path resourcePath = "../../resources/";
+std::filesystem::path resourcePath = "../resources/";
 
 struct GlobalUniforms
 {
@@ -165,22 +165,26 @@ struct App
             xr::VulkanGraphicsDeviceGetInfoKHR{xrSystemId, instance->instance, nullptr}, xrDispatchLoader);
         auto xrGraphicsDeviceExtensions = xrInstance->getVulkanDeviceExtensionsKHR(xrSystemId, xrDispatchLoader);
 
-        device = std::make_unique<letc::Device>(*instance);
+        letc::DeviceBuilder deviceBuilder;
+        deviceBuilder.addExtensions(split(xrGraphicsDeviceExtensions));
+        deviceBuilder.requestDevice(xrGraphicsDevice);
+        deviceBuilder.requestQueue("graphics", vk::QueueFlagBits::eGraphics);
+        device = std::make_unique<letc::Device>(*instance, deviceBuilder);
         VULKAN_HPP_DEFAULT_DISPATCHER.init(device->device);
 
         // allocator initialization
         allocator = std::make_unique<letc::Allocator>(*instance, *device);
 
         // swapchain + queue initialization
-        swapchain = std::make_unique<letc::Swapchain>(*window, *surface, *device, *device);
-        queue = device->device.getQueue(device->graphicsQueueFamilyIndex, 0);
+        swapchain = std::make_unique<letc::Swapchain>(*window, *surface, *device);
+        queue = device->queues["graphics"].queue;
 
         xr::GraphicsBindingVulkanKHR xrGraphicsBinding{};
         xrGraphicsBinding.next = nullptr;
         xrGraphicsBinding.instance = instance->instance;
         xrGraphicsBinding.physicalDevice = device->physicalDevice;
         xrGraphicsBinding.device = device->device;
-        xrGraphicsBinding.queueFamilyIndex = device->graphicsQueueFamilyIndex;
+        xrGraphicsBinding.queueFamilyIndex = device->queues["graphics"].queueFamilyIndex;
         xrGraphicsBinding.queueIndex = 0;
 
         xr::SessionCreateInfo xrSessionInfo{};
@@ -377,7 +381,7 @@ struct App
         // command buffer initialization
         commandPool =
             device->device.createCommandPoolUnique(vk::CommandPoolCreateInfo{}
-                                                       .setQueueFamilyIndex(device->graphicsQueueFamilyIndex)
+                                                       .setQueueFamilyIndex(device->queues["graphics"].queueFamilyIndex)
                                                        .setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer));
         commandBuffers =
             std::move(device->device.allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo{}
@@ -565,6 +569,8 @@ struct App
         auto now = std::chrono::steady_clock::now();
         if (now - lastButtonPressTime >= BUTTON_DEBOUNCE_TIME || button != lastButtonPressed)
         {
+            points->points.clear();
+
             switch (button)
             {
             case 'A':
@@ -968,6 +974,9 @@ struct App
         pbrMaterial->updateDescriptorBufferInfo(0, 2, *camera->buffer, 0, sizeof(letc::Camera::Uniform));
         pbrMaterial->updateDescriptorSet(0);
 
+        pointsRenderer->material->updateDescriptorBufferInfo(0, 0, *camera->buffer, 0, sizeof(letc::Camera::Uniform));
+        pointsRenderer->material->updateDescriptorSet(0);
+
         vk::UniqueCommandBuffer &commandBuffer = commandBuffers.at(2);
         commandBuffer->reset(vk::CommandBufferResetFlagBits::eReleaseResources);
         commandBuffer->begin(vk::CommandBufferBeginInfo{}.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
@@ -1059,6 +1068,10 @@ struct App
 
             models[i].draw(*commandBuffer);
         }
+
+        pointsRenderer->pipeline->bind(commandBuffer.get());
+        pointsRenderer->material->bind(commandBuffer.get(), *pointsRenderer->pipeline);
+        points->draw(*commandBuffer);
 
         commandBuffer->endRendering();
 

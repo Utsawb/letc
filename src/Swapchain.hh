@@ -5,12 +5,14 @@
 
 #include "pch.hh"
 
+#include "Device.hh"
+
 namespace letc
 {
     struct Swapchain
     {
         const vk::SurfaceKHR &surface;
-        const vk::Device &device;
+        const Device &device;
 
         vk::SurfaceCapabilitiesKHR capabilities;
         vk::SurfaceFormatKHR format;
@@ -24,14 +26,13 @@ namespace letc
             return swapchain;
         }
 
-        Swapchain(const vkfw::Window &window, const vk::SurfaceKHR &surface, const vk::PhysicalDevice &physicalDevice,
-                  const vk::Device &device)
+        Swapchain(const vkfw::Window &window, const vk::SurfaceKHR &surface, const Device &device)
             : surface(surface), device(device)
         {
             /*
                 Surface -> Swapchain values
             */
-            capabilities = physicalDevice.getSurfaceCapabilitiesKHR(surface);
+            capabilities = device.physicalDevice.getSurfaceCapabilitiesKHR(surface);
             // format = physicalDevice.getSurfaceFormatsKHR(surface).front();
             format = vk::Format::eR8G8B8A8Srgb;
             presentMode = vk::PresentModeKHR::eFifo;
@@ -62,12 +63,12 @@ namespace letc
             swapchainCreateInfo.setCompositeAlpha(vk::CompositeAlphaFlagBitsKHR::eOpaque);
             swapchainCreateInfo.setPresentMode(presentMode);
             swapchainCreateInfo.setClipped(VK_TRUE);
-            swapchain = device.createSwapchainKHR(swapchainCreateInfo);
+            swapchain = device.device.createSwapchainKHR(swapchainCreateInfo);
 
             /*
                 Swapchain Images & Views
             */
-            images = device.getSwapchainImagesKHR(swapchain);
+            images = device.device.getSwapchainImagesKHR(swapchain);
             imageViews.reserve(images.size());
             for (const vk::Image &image : images)
             {
@@ -85,7 +86,7 @@ namespace letc
                 imageSubresourceRange.setLayerCount(1);
                 imageViewCreateInfo.setSubresourceRange(imageSubresourceRange);
 
-                imageViews.push_back(device.createImageView(imageViewCreateInfo));
+                imageViews.push_back(device.device.createImageView(imageViewCreateInfo));
             }
         }
 
@@ -93,9 +94,9 @@ namespace letc
         {
             for (const vk::ImageView &imageView : imageViews)
             {
-                device.destroyImageView(imageView);
+                device.device.destroyImageView(imageView);
             }
-            device.destroySwapchainKHR(swapchain);
+            device.device.destroySwapchainKHR(swapchain);
         }
     };
 }; // namespace letc

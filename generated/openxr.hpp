@@ -2,37 +2,6 @@
 //     See cpp_generator.py for modifications
 // ************************************************************
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /*
 ** Copyright (c) 2017-2021 The Khronos Group Inc.
 ** Copyright (c) 2019-2021 Collabora, Ltd.
@@ -95,11 +64,14 @@
 
 /*!
  * @defgroup utility_accessors Utility free-function accessors
- * @brief Free functions for "getting" or "putting" from/to a wrapped or projected type, etc (see "more" for shared documentation by function name).
+ * @brief Free functions for "getting" or "putting" from/to a wrapped or projected type, etc (see "more" for shared
+ * documentation by function name).
  *
- * These have common names, like `get()`, `put()`, and `to_string()`. They should be found by argument-dependent lookup and not need explicit namespace specification, e.g. do `get(myInstance)` not `xr::get(myInstance)`.
+ * These have common names, like `get()`, `put()`, and `to_string()`. They should be found by argument-dependent lookup
+ * and not need explicit namespace specification, e.g. do `get(myInstance)` not `xr::get(myInstance)`.
  *
- * These functions have shared behavior. For the purposes of these functions, the packed version type xr::Version behaves like a structure projection.
+ * These functions have shared behavior. For the purposes of these functions, the packed version type xr::Version
+ * behaves like a structure projection.
  *
  * - `get()` functions "unwrap" one layer of projection.
  *   - If applied to a structure projection, it gives you a pointer to const for the original (C) struct type.
@@ -108,13 +80,22 @@
  *     which act like smart pointers, it gives you the "pointed-to" projected handle (e.g. xr::Instance).
  *     Apply it twice to get the raw handle if needed for something.
  *   - If applied to an xr::Flags type, it gives you the raw C integer value.
- * - `get_base()` is a variant of `get()` for structure projections that are "derived" - it gets the "parent struct" pointer instead.
- * - `put()` functions clear what they're given (by default, some types optionally allow not clearing) and return the address for use in an output parameter.
- *   - If applied to a `UniqueHandle<>` or alias, the previous handle, if any, is destroyed, then the address of the raw handle is returned.
- *   - If applied to a handle projection, the handle is reset to null (by default) and the address of the raw handle is returned. (The handle is not destroyed because these types do not convey ownership!) To avoid clearing, pass `false` for the optional argument `clear`.
- *   - If applied to a (non-abstract) structure projection, the structure is cleared/reset except for the value of `next` (by default), then the address is returned as a pointer to the raw C structure type. To avoid clearing, pass `false` for the optional argument `clear`.
- * - `to_string_literal()` is available only for enums, and returns (constexpr if supported by your language version) the stringification of the projected value name as a string literal.
- * - `to_string()` is available only for enums, and wraps the result of `to_string_literal()` in a `std::string` to match the standard library's behavior.
+ * - `get_base()` is a variant of `get()` for structure projections that are "derived" - it gets the "parent struct"
+ * pointer instead.
+ * - `put()` functions clear what they're given (by default, some types optionally allow not clearing) and return the
+ * address for use in an output parameter.
+ *   - If applied to a `UniqueHandle<>` or alias, the previous handle, if any, is destroyed, then the address of the raw
+ * handle is returned.
+ *   - If applied to a handle projection, the handle is reset to null (by default) and the address of the raw handle is
+ * returned. (The handle is not destroyed because these types do not convey ownership!) To avoid clearing, pass `false`
+ * for the optional argument `clear`.
+ *   - If applied to a (non-abstract) structure projection, the structure is cleared/reset except for the value of
+ * `next` (by default), then the address is returned as a pointer to the raw C structure type. To avoid clearing, pass
+ * `false` for the optional argument `clear`.
+ * - `to_string_literal()` is available only for enums, and returns (constexpr if supported by your language version)
+ * the stringification of the projected value name as a string literal.
+ * - `to_string()` is available only for enums, and wraps the result of `to_string_literal()` in a `std::string` to
+ * match the standard library's behavior.
  */
 
 /**
@@ -124,95 +105,35 @@
  * @ingroup config
  */
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #if !defined(OPENXR_HPP_NAMESPACE)
 #define OPENXR_HPP_NAMESPACE xr
-#endif  // !OPENXR_HPP_NAMESPACE
+#endif // !OPENXR_HPP_NAMESPACE
 /*!
  * @namespace xr
  * @brief Namespace containing all OpenXR-Hpp entities.
  *
- * If the default namespace `xr` isn't suitable, you can define `OPENXR_HPP_NAMESPACE` to a different name before including any OpenXR-Hpp headers.
+ * If the default namespace `xr` isn't suitable, you can define `OPENXR_HPP_NAMESPACE` to a different name before
+ * including any OpenXR-Hpp headers.
  *
  * @see OPENXR_HPP_NAMESPACE
  */
-namespace OPENXR_HPP_NAMESPACE {}  // namespace OPENXR_HPP_NAMESPACE
+namespace OPENXR_HPP_NAMESPACE
+{
+} // namespace OPENXR_HPP_NAMESPACE
 
 #include "openxr_atoms.hpp"
-#include "openxr_time.hpp"
-#include "openxr_version.hpp"
-#include "openxr_dispatch_static.hpp"
 #include "openxr_dispatch_dynamic.hpp"
+#include "openxr_dispatch_static.hpp"
 #include "openxr_handles.hpp"
 #include "openxr_structs.hpp"
+#include "openxr_time.hpp"
+#include "openxr_version.hpp"
 
 /*
  * Inline implementations of all trampoline methods and free functions follow.
- * Prototypes may be found in openxr_handles.hpp, either in the associated handle class, or immediately following the section of handle classes.
+ * Prototypes may be found in openxr_handles.hpp, either in the associated handle class, or immediately following the
+ * section of handle classes.
  */
 #include "openxr_method_impls.hpp"
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#endif  // ifndef OPENXR_HPP_
-
+#endif // ifndef OPENXR_HPP_

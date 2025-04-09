@@ -4,17 +4,22 @@
 #define PCH_HH
 
 #include <algorithm>
+#include <chrono>
 #include <filesystem>
 #include <format>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <map>
 #include <memory>
+#include <ranges>
+#include <set>
 #include <span>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
+#include <utility>
 #include <vector>
-#include <chrono>
 
 #define GLM_ENABLE_EXPERIMENTAL
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -36,8 +41,9 @@
 
 #define XR_USE_GRAPHICS_API_VULKAN
 
-#include <openxr/openxr_platform.h>
 #include <openxr/openxr.h>
+#include <openxr/openxr_platform.h>
+
 #include "openxr.hpp"
 
 #include <vkfw/vkfw.hpp>
@@ -72,6 +78,18 @@ inline std::vector<char> readFile(const std::filesystem::path &path)
     fileStream.read(buffer.data(), fileSize);
 
     return buffer;
+}
+
+inline std::vector<std::string> split(std::string str, std::string delim = " ")
+{
+    std::vector<std::string> result;
+    for (std::size_t pos; (pos = str.find(delim)) != std::string::npos;)
+    {
+        result.emplace_back(str.substr(0, pos));
+        str = str.substr(pos + delim.size());
+    }
+    result.emplace_back(str);
+    return result;
 }
 
 #endif // PCH_HH

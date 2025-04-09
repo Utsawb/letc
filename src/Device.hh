@@ -1,131 +1,185 @@
 #pragma once
-#include <vulkan/vulkan_handles.hpp>
-#include <vulkan/vulkan_structs.hpp>
+
 #ifndef LETC_DEVICE_HH
 #define LETC_DEVICE_HH
 
-#include "pch.hh"
-
-// custom hash for the queue flags
-namespace std
-{
-    template <> struct hash<vk::QueueFlags>
-    {
-        std::size_t operator()(const vk::QueueFlags &flags) const noexcept
-        {
-            return std::hash<uint32_t>{}(static_cast<uint32_t>(flags));
-        }
-    };
-}; // namespace std
+#include "Instance.hh"
 
 namespace letc
 {
+
+    struct DeviceBuilder
+    {
+        std::set<std::string> deviceExtensions;
+        std::unordered_map<std::string, vk::QueueFlagBits> requestedQueues;
+        std::optional<vk::PhysicalDevice> physicalDevice;
+
+        DeviceBuilder &addExtension(const char *extension)
+        {
+            deviceExtensions.insert(extension);
+            return *this;
+        }
+
+        DeviceBuilder &addExtensions(const std::vector<std::string> &extensions)
+        {
+            for (const auto &e : extensions)
+            {
+                deviceExtensions.insert(e);
+            }
+            return *this;
+        }
+
+        DeviceBuilder &requestQueue(const std::string &uniqueIdentifier, const vk::QueueFlagBits &queueFlags)
+        {
+            requestedQueues.emplace(uniqueIdentifier, queueFlags);
+            return *this;
+        }
+
+        DeviceBuilder &requestDevice(const vk::PhysicalDevice &physicalDevice)
+        {
+            this->physicalDevice = physicalDevice;
+            return *this;
+        }
+
+        DeviceBuilder()
+        {
+            deviceExtensions.insert(vk::KHRDynamicRenderingExtensionName);
+            deviceExtensions.insert(vk::KHRSwapchainExtensionName);
+        }
+    };
+
+    struct Queue
+    {
+        std::string id;
+        uint32_t queueFamilyIndex;
+        vk::Queue queue;
+    };
+
     struct Device
     {
+        const Instance &instance;
+        DeviceBuilder deviceBuilder;
         vk::PhysicalDevice physicalDevice;
         vk::Device device;
-        uint32_t graphicsQueueFamilyIndex;
+        std::unordered_map<std::string, Queue> queues;
 
-        operator const vk::Device &()
+        Device(const Instance &instance, const DeviceBuilder &builder) : instance(instance), deviceBuilder(builder)
         {
-            return device;
-        }
-        operator const vk::PhysicalDevice &() const
-        {
-            return physicalDevice;
-        }
-
-        Device(const vk::Instance &instance)
-        {
-            std::vector<const char *> deviceExtensions{};
-            deviceExtensions.push_back(vk::KHRDynamicRenderingExtensionName);
-            deviceExtensions.push_back(vk::KHRSwapchainExtensionName);
-
-            // this is what i get for not making the device selector more extensable,
-            // but like cmon this is kinda messed up!! delete these once I remove
-            // open xr from this project, me and my homies hate open xr (!)
-            deviceExtensions.push_back(vk::KHRExternalMemoryExtensionName);
-            deviceExtensions.push_back(vk::KHRExternalSemaphoreExtensionName);
-            deviceExtensions.push_back(vk::KHRDedicatedAllocationExtensionName);
-            deviceExtensions.push_back(vk::KHRGetMemoryRequirements2ExtensionName);
-            deviceExtensions.push_back("VK_KHR_external_memory_win32");
-            deviceExtensions.push_back("VK_KHR_win32_keyed_mutex");
-            // deviceExtensions.push_back("VK_EXT_debug_marker");
-
-
-            /*
-                Physical Device
-            */
-            auto physicalDevices = instance.enumeratePhysicalDevices();
-            bool found = false;
-            for (const auto &pd : physicalDevices)
+            if (deviceBuilder.physicalDevice.has_value())
             {
-                auto availableExtensions = pd.enumerateDeviceExtensionProperties();
-                bool extensionsSupported = true;
-                for (auto requiredExt : deviceExtensions)
+                physicalDevice = *deviceBuilder.physicalDevice;
+            }
+            else
+            {
+                auto physicalDevices = instance.instance.enumeratePhysicalDevices();
+                for (const auto &pd : physicalDevices)
                 {
-                    bool extFound = false;
-                    for (const auto &ext : availableExtensions)
+                    auto pdExtensions = pd.enumerateDeviceExtensionProperties();
+                    std::set<std::string> availableExtensions;
+                    std::transform(pdExtensions.begin(), pdExtensions.end(),
+                                   std::inserter(availableExtensions, availableExtensions.end()),
+                                   [](const vk::ExtensionProperties &ext) { return std::string(ext.extensionName); });
+                    std::set<std::string> intersection;
+                    std::set_intersection(deviceBuilder.deviceExtensions.begin(), deviceBuilder.deviceExtensions.end(),
+                                          availableExtensions.begin(), availableExtensions.end(),
+                                          std::inserter(intersection, intersection.end()));
+                    if (intersection.size() == deviceBuilder.deviceExtensions.size())
                     {
-                        if (std::strcmp(ext.extensionName, requiredExt) == 0)
-                        {
-                            extFound = true;
-                            break;
-                        }
-                    }
-                    if (!extFound)
-                    {
-                        extensionsSupported = false;
+                        physicalDevice = pd;
                         break;
                     }
                 }
-                if (!extensionsSupported)
-                {
-                    continue;
-                }
+            }
 
-                auto queueFamilies = pd.getQueueFamilyProperties();
-                for (uint32_t i = 0; i < queueFamilies.size(); i++)
+            const auto allQueueProps = physicalDevice.getQueueFamilyProperties();
+            struct FamilyInfo
+            {
+                uint32_t index;
+                vk::QueueFamilyProperties properties;
+                uint32_t allocated;
+            };
+            std::vector<FamilyInfo> families;
+            for (uint32_t i = 0; i < allQueueProps.size(); ++i)
+            {
+                families.push_back({i, allQueueProps[i], 0});
+            }
+
+            // Structure to record assignment for each requested queue.
+            struct Assignment
+            {
+                std::string id;
+                uint32_t familyIndex;
+                uint32_t offset;
+                vk::QueueFlagBits flag;
+            };
+            std::vector<Assignment> assignments;
+
+            for (const auto &req : deviceBuilder.requestedQueues)
+            {
+                const std::string &identifier = req.first;
+                vk::QueueFlagBits requestedFlags = req.second;
+                bool found = false;
+                for (auto &family : families)
                 {
-                    if ((queueFamilies[i].queueFlags & vk::QueueFlagBits::eGraphics) && queueFamilies[i].queueCount > 0)
+                    if ((family.properties.queueFlags & requestedFlags) &&
+                        (family.allocated < family.properties.queueCount))
                     {
-                        graphicsQueueFamilyIndex = i;
-                        physicalDevice = pd;
+                        assignments.push_back({identifier, family.index, family.allocated, requestedFlags});
+                        family.allocated += 1;
                         found = true;
                         break;
                     }
                 }
-                if (found)
-                    break;
+                if (!found)
+                {
+                    throw std::runtime_error("No suitable queue family found for request: " + identifier);
+                }
             }
 
-            assertThrow(found, "no suitable physical device found");
+            std::unordered_map<uint32_t, uint32_t> familyQueueCount;
+            for (const auto &assignment : assignments)
+            {
+                familyQueueCount[assignment.familyIndex]++;
+            }
+            std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
+            std::vector<std::vector<float>> prioritiesStorage;
+            for (const auto &entry : familyQueueCount)
+            {
+                uint32_t familyIndex = entry.first;
+                uint32_t queueCount = entry.second;
+                prioritiesStorage.push_back(std::vector<float>(queueCount, 1.0f));
+                vk::DeviceQueueCreateInfo dqci{};
+                dqci.queueFamilyIndex = familyIndex;
+                dqci.queueCount = queueCount;
+                dqci.pQueuePriorities = prioritiesStorage.back().data();
+                queueCreateInfos.push_back(dqci);
+            }
 
-            float queuePriority = 1.0f;
-            vk::DeviceQueueCreateInfo queueCreateInfo{};
-            queueCreateInfo.setQueueFamilyIndex(graphicsQueueFamilyIndex);
-            queueCreateInfo.setQueueCount(1);
-            queueCreateInfo.setPQueuePriorities(&queuePriority);
+            std::vector<const char *> extensions;
+            for (const auto &ext : deviceBuilder.deviceExtensions)
+            {
+                extensions.push_back(ext.c_str());
+            }
 
             vk::PhysicalDeviceDynamicRenderingFeaturesKHR dynamicRenderingFeatures{};
-            dynamicRenderingFeatures.setDynamicRendering(true);
+            dynamicRenderingFeatures.dynamicRendering = VK_TRUE;
             vk::PhysicalDeviceFeatures deviceFeatures{};
-            deviceFeatures.setFillModeNonSolid(true);
+            deviceFeatures.fillModeNonSolid = VK_TRUE;
 
             vk::DeviceCreateInfo deviceCreateInfo{};
-            deviceCreateInfo.setQueueCreateInfoCount(1);
-            deviceCreateInfo.setPQueueCreateInfos(&queueCreateInfo);
-            deviceCreateInfo.setPEnabledExtensionNames(deviceExtensions);
+            deviceCreateInfo.setQueueCreateInfos(queueCreateInfos);
+            deviceCreateInfo.setPEnabledExtensionNames(extensions);
             deviceCreateInfo.setPEnabledFeatures(&deviceFeatures);
             deviceCreateInfo.setPNext(&dynamicRenderingFeatures);
 
-            // Create the logical device.
             device = physicalDevice.createDevice(deviceCreateInfo);
-        }
 
-        ~Device()
-        {
-            device.destroy();
+            for (const auto &assignment : assignments)
+            {
+                vk::Queue vkQueue = device.getQueue(assignment.familyIndex, assignment.offset);
+                Queue q{assignment.id, assignment.familyIndex, vkQueue};
+                queues.emplace(assignment.id, q);
+            }
         }
     };
 }; // namespace letc
