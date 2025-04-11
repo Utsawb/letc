@@ -1,8 +1,5 @@
 #pragma once
 
-#ifndef LETC_ALLOCATOR_HH
-#define LETC_ALLOCATOR_HH
-
 #include "pch.hh"
 
 #include "Device.hh"
@@ -49,5 +46,3 @@ namespace letc
         }
     };
 }; // namespace letc
-
-#endif

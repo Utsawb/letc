@@ -1,8 +1,5 @@
 #pragma once
 
-#ifndef PCH_HH
-#define PCH_HH
-
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
@@ -54,10 +51,6 @@
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 
-#include <Eigen/Dense>
-#include <Eigen/Sparse>
-#include <Eigen/SparseQR>
-
 #define assertThrow(condition, msg)                                                                                    \
     if (!(condition))                                                                                                  \
     {                                                                                                                  \
@@ -91,5 +84,3 @@ inline std::vector<std::string> split(std::string str, std::string delim = " ")
     result.emplace_back(str);
     return result;
 }
-
-#endif // PCH_HH

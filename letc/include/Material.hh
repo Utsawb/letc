@@ -1,11 +1,5 @@
 #pragma once
 
-#include <optional>
-#include <vulkan/vulkan_handles.hpp>
-#include <vulkan/vulkan_structs.hpp>
-#ifndef LETC_MATERIAL_HH
-#define LETC_MATERIAL_HH
-
 #include "pch.hh"
 
 #include "Allocator.hh"
@@ -176,5 +170,3 @@ namespace letc
     };
 
 }; // namespace letc
-
-#endif // LETC_MATERIAL_HH

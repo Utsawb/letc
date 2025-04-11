@@ -1,8 +1,5 @@
 #pragma once
 
-#ifndef LETC_INSTANCED_SPHERES_HH
-#define LETC_INSTANCED_SPHERES_HH
-
 #include "pch.hh"
 
 #include "Allocator.hh"
@@ -96,5 +93,3 @@ namespace letc
         }
     };
 }; // namespace letc
-
-#endif

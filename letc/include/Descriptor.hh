@@ -1,9 +1,8 @@
 #pragma once
 
-#ifndef LETC_DESCRIPTOR_HH
-#define LETC_DESCRIPTOR_HH
-
 #include "pch.hh"
+
+#include "spirv_reflect.hh"
 
 #include "Device.hh"
 
@@ -55,5 +54,3 @@ namespace letc
         }
     };
 } // namespace letc
-
-#endif // LETC_DESCRIPTOR_HH

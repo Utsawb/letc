@@ -7,7 +7,6 @@
 
 namespace letc
 {
-
     struct DeviceBuilder
     {
         std::set<std::string> deviceExtensions;
@@ -180,6 +179,11 @@ namespace letc
                 Queue q{assignment.id, assignment.familyIndex, vkQueue};
                 queues.emplace(assignment.id, q);
             }
+        }
+
+        ~Device()
+        {
+            device.destroy();
         }
     };
 }; // namespace letc

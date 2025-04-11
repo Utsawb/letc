@@ -1,11 +1,5 @@
 #pragma once
 
-#include <vulkan/vulkan_enums.hpp>
-#include <vulkan/vulkan_handles.hpp>
-#include <vulkan/vulkan_structs.hpp>
-#ifndef LETC_PIPELINE_HH
-#define LETC_PIPELINE_HH
-
 #include "pch.hh"
 
 #include "Buffer.hh"
@@ -154,7 +148,7 @@ namespace letc
             return *this;
         }
 
-        GraphicsPipelineBuilder &setLayout(const DescriptorLayout * const& layout)
+        GraphicsPipelineBuilder &setLayout(const DescriptorLayout *const &layout)
         {
             descriptorLayout = layout;
             return *this;
@@ -214,16 +208,15 @@ namespace letc
         vk::PipelineLayout layout;
         vk::Pipeline pipeline;
 
-        GraphicsPipeline(const Device &device,
-                  const GraphicsPipelineBuilder &graphicsPipelineBuilder)
+        GraphicsPipeline(const Device &device, const GraphicsPipelineBuilder &graphicsPipelineBuilder)
             : device(device), builder(graphicsPipelineBuilder)
         {
             for (auto &code : builder.shaderCode)
             {
                 shaders.push_back(
                     device.device.createShaderModule(vk::ShaderModuleCreateInfo{}
-                                                          .setCodeSize(code.size())
-                                                          .setPCode(reinterpret_cast<uint32_t *>(code.data()))));
+                                                         .setCodeSize(code.size())
+                                                         .setPCode(reinterpret_cast<uint32_t *>(code.data()))));
             }
             for (size_t i = 0; i < builder.shaderStageInfos.size(); i++)
             {
@@ -278,9 +271,6 @@ namespace letc
 
     class IPipeline
     {
-
     };
 
 }; // namespace letc
-
-#endif // LETC_PIPELINE_HH

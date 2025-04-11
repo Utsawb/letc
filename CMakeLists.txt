@@ -1,53 +1,29 @@
 cmake_minimum_required(VERSION 3.24)
-project(letc)
-include(FetchContent)
+project(letc-dev LANGUAGES CXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_STANDARD 26)
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-file(GLOB_RECURSE SOURCES "src/*.cc")
-file(GLOB_RECURSE HEADERS "src/*.hh")
-file(GLOB_RECURSE GLSL "resources/*.glsl")
-file(GLOB_RECURSE GLTF "resources/*.gltf")
-
-add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS} ${OPENXRHPP} ${GLSL} ${GLTF})
-
-target_include_directories(${CMAKE_PROJECT_NAME}
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/generated
-)
+include(FetchContent)
 
 find_package(Vulkan REQUIRED)
-include_directories(${VULKAN_INCLUDE_DIRS})
-target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Vulkan::Vulkan)
 
 set(UseFindPackage TRUE)
 if(UseFindPackage)
     find_package(OpenXR REQUIRED)
-    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OpenXR::openxr_loader)
-
     find_package(glm REQUIRED)
-    target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${GLM_INCLUDE_DIRS})
-
     find_package(glfw3 REQUIRED)
-    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE glfw)
-
-    # this ones just not that popular sadly
     FetchContent_Declare(
       vkfw
       GIT_REPOSITORY https://github.com/Cvelth/vkfw.git
       GIT_TAG        main
     )
     FetchContent_MakeAvailable(vkfw)
-    target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${vkfw_SOURCE_DIR}/include)
-
     find_package(VulkanMemoryAllocator REQUIRED)
-    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE GPUOpen::VulkanMemoryAllocator)
-
     find_package(assimp REQUIRED)
-    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE assimp::assimp)
-
     find_package(Eigen3 REQUIRED)
-    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Eigen3::Eigen)
+    find_package(Taskflow REQUIRED)
 else()
     FetchContent_Declare(
       openxr
@@ -110,7 +86,12 @@ else()
     target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Eigen3::Eigen)
 endif()
 
-target_precompile_headers(${CMAKE_PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/pch.hh")
+add_subdirectory(letc)
 
-set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES CXX_STANDARD 26)
-set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
+file(GLOB TESTBED_DIRS LIST_DIRECTORIES true "testbeds/*")
+foreach(TESTBED_DIR ${TESTBED_DIRS})
+    if(IS_DIRECTORY ${TESTBED_DIR} AND EXISTS "${TESTBED_DIR}/CMakeLists.txt")
+        message(STATUS "Adding testbed: ${TESTBED_DIR}")
+        add_subdirectory(${TESTBED_DIR})
+    endif()
+endforeach()

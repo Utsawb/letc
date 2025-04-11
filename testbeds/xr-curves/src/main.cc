@@ -1,6 +1,3 @@
-// Created by: Utsawb Lamichhane
-#include "pch.hh"
-
 #include "Allocator.hh"
 #include "Buffer.hh"
 #include "Camera.hh"
