@@ -3,19 +3,65 @@
 #ifndef LETC_MODEL_HH
 #define LETC_MODEL_HH
 
-#include "Allocator.hh"
-#include "assimp/mesh.h"
 #include <iostream>
 #include <memory>
-#include <vulkan/vulkan.hpp>
-
 
 #include "pch.hh"
 
+#include "Allocator.hh"
 #include "Buffer.hh"
+#include "Descriptor.hh"
+#include "Device.hh"
+#include "Material.hh"
+#include "Pipeline.hh"
+#include "Swapchain.hh"
 
 namespace letc
 {
+    struct ModelRenderer
+    {
+        const Device &device;
+        const Allocator &allocator;
+
+        std::unique_ptr<DescriptorLayout> layout;
+        std::unique_ptr<Material> material;
+        std::unique_ptr<GraphicsPipeline> pipeline;
+
+        ModelRenderer(const Allocator &allocator, const Device &device, const Swapchain &swapchain,
+                      const std::vector<char> &vertexCode, const std::vector<char> &fragmentCode)
+            : allocator(allocator), device(device)
+        {
+            layout = std::make_unique<DescriptorLayout>(device);
+            layout->addBinding(0, 0, vk::DescriptorType::eUniformBuffer,
+                               vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 1);
+            layout->addBinding(0, 1, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eFragment, 1);
+            layout->addBinding(0, 2, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex, 1);
+            layout->addBinding(1, 0, vk::DescriptorType::eUniformBufferDynamic,
+                               vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 1);
+            layout->generateLayouts();
+
+            material = std::make_unique<Material>(device, allocator, *layout);
+
+            letc::GraphicsPipelineBuilder gpb;
+            gpb.addShaderStage(vertexCode, vk::ShaderStageFlagBits::eVertex);
+            gpb.addShaderStage(fragmentCode, vk::ShaderStageFlagBits::eFragment);
+            gpb.addVertexInputBinding(0, sizeof(glm::vec4), vk::VertexInputRate::eVertex); // Position
+            gpb.addVertexInputAttribute(0, 0, vk::Format::eR32G32B32A32Sfloat, 0);
+            gpb.addVertexInputBinding(1, sizeof(glm::vec4), vk::VertexInputRate::eVertex); // Normal
+            gpb.addVertexInputAttribute(1, 1, vk::Format::eR32G32B32A32Sfloat, 0);
+            gpb.addVertexInputBinding(2, sizeof(glm::vec4), vk::VertexInputRate::eVertex); // Tangent
+            gpb.addVertexInputAttribute(2, 2, vk::Format::eR32G32B32A32Sfloat, 0);
+            gpb.addVertexInputBinding(3, sizeof(glm::vec2), vk::VertexInputRate::eVertex); // UV
+            gpb.addVertexInputAttribute(3, 3, vk::Format::eR32G32Sfloat, 0);
+            gpb.setLayout(layout.get());
+            gpb.renderingInfo.setColorAttachmentCount(1);
+            gpb.renderingInfo.setPColorAttachmentFormats(&swapchain.format.format);
+            gpb.setRasterization(gpb.rasterizationInfo.setCullMode(vk::CullModeFlagBits::eNone));
+
+            pipeline = std::make_unique<GraphicsPipeline>(device, gpb);
+        }
+    };
+
     struct Model
     {
         std::vector<unsigned> index;
@@ -54,13 +100,13 @@ namespace letc
 
             // const aiScene *scene = importer.ReadFile(
             //     modelPath.string(), aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices |
-            //                             aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_ValidateDataStructure |
-            //                             aiProcess_ImproveCacheLocality | aiProcess_GenUVCoords | aiProcess_FlipUVs);
+            //                             aiProcess_Triangulate | aiProcess_GenNormals |
+            //                             aiProcess_ValidateDataStructure | aiProcess_ImproveCacheLocality |
+            //                             aiProcess_GenUVCoords | aiProcess_FlipUVs);
 
-            const aiScene *scene = importer.ReadFile(
-                modelPath.string(),
-                aiProcess_Triangulate | aiProcess_GenNormals | 
-                    aiProcess_ImproveCacheLocality | aiProcess_GenUVCoords | aiProcess_FlipUVs);
+            const aiScene *scene = importer.ReadFile(modelPath.string(), aiProcess_Triangulate | aiProcess_GenNormals |
+                                                                             aiProcess_ImproveCacheLocality |
+                                                                             aiProcess_GenUVCoords | aiProcess_FlipUVs);
 
             assertThrow(scene, "failed to load model: " + modelPath.string());
             assertThrow(scene->mNumMeshes == 1, "model should only have one mesh");
@@ -74,8 +120,9 @@ namespace letc
                     index.push_back(mesh->mFaces[i].mIndices[1]);
                     index.push_back(mesh->mFaces[i].mIndices[2]);
                 }
-                indexBuffer = std::make_unique<Buffer>(allocator, index.size() * sizeof(unsigned), vk::BufferUsageFlagBits::eIndexBuffer,
-                                                       VMA_MEMORY_USAGE_CPU_TO_GPU);
+                indexBuffer =
+                    std::make_unique<Buffer>(allocator, index.size() * sizeof(unsigned),
+                                             vk::BufferUsageFlagBits::eIndexBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
             }
 
             if (mesh->HasPositions())
@@ -85,8 +132,8 @@ namespace letc
                     position.push_back({mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z, 1.0f});
                 }
                 positionBuffer =
-                    std::make_unique<Buffer>(allocator, position.size() * sizeof(glm::vec4), vk::BufferUsageFlagBits::eVertexBuffer,
-                                             VMA_MEMORY_USAGE_CPU_TO_GPU);
+                    std::make_unique<Buffer>(allocator, position.size() * sizeof(glm::vec4),
+                                             vk::BufferUsageFlagBits::eVertexBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
                 validBuffers.push_back(positionBuffer->buffer);
             }
 
@@ -97,8 +144,8 @@ namespace letc
                     normal.push_back({mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z, 1.0f});
                 }
                 normalBuffer =
-                    std::make_unique<Buffer>(allocator, normal.size() * sizeof(glm::vec4), vk::BufferUsageFlagBits::eVertexBuffer,
-                                             VMA_MEMORY_USAGE_CPU_TO_GPU);
+                    std::make_unique<Buffer>(allocator, normal.size() * sizeof(glm::vec4),
+                                             vk::BufferUsageFlagBits::eVertexBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
                 validBuffers.push_back(normalBuffer->buffer);
             }
 
@@ -109,8 +156,8 @@ namespace letc
                     tangent.push_back({mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z, 1.0f});
                 }
                 tangentBuffer =
-                    std::make_unique<Buffer>(allocator, tangent.size() * sizeof(glm::vec4), vk::BufferUsageFlagBits::eVertexBuffer,
-                                             VMA_MEMORY_USAGE_CPU_TO_GPU);
+                    std::make_unique<Buffer>(allocator, tangent.size() * sizeof(glm::vec4),
+                                             vk::BufferUsageFlagBits::eVertexBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
                 validBuffers.push_back(tangentBuffer->buffer);
             }
 
@@ -120,8 +167,9 @@ namespace letc
                 {
                     uv.push_back({mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y});
                 }
-                uvBuffer = std::make_unique<Buffer>(allocator, uv.size() * sizeof(glm::vec2), vk::BufferUsageFlagBits::eVertexBuffer,
-                                                    VMA_MEMORY_USAGE_CPU_TO_GPU);
+                uvBuffer =
+                    std::make_unique<Buffer>(allocator, uv.size() * sizeof(glm::vec2),
+                                             vk::BufferUsageFlagBits::eVertexBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
                 validBuffers.push_back(uvBuffer->buffer);
             }
 
@@ -132,8 +180,9 @@ namespace letc
                     color.push_back(
                         {mesh->mColors[0][i].r, mesh->mColors[0][i].g, mesh->mColors[0][i].b, mesh->mColors[0][i].a});
                 }
-                colorBuffer = std::make_unique<Buffer>(allocator, color.size() * sizeof(glm::vec4), vk::BufferUsageFlagBits::eVertexBuffer,
-                                                       VMA_MEMORY_USAGE_CPU_TO_GPU);
+                colorBuffer =
+                    std::make_unique<Buffer>(allocator, color.size() * sizeof(glm::vec4),
+                                             vk::BufferUsageFlagBits::eVertexBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
                 validBuffers.push_back(colorBuffer->buffer);
             }
         }
@@ -170,17 +219,10 @@ namespace letc
 
         void draw(const vk::CommandBuffer &commandBuffer)
         {
-            if (indexBuffer)
-            {
-                commandBuffer.bindIndexBuffer(indexBuffer->buffer, 0, vk::IndexType::eUint32);
-                commandBuffer.bindVertexBuffers(0, validBuffers.size(), validBuffers.data(),
-                                                std::vector<vk::DeviceSize>(validBuffers.size(), 0).data());
-                commandBuffer.drawIndexed(index.size(), 1, 0, 0, 0);
-            }
-            else
-            {
-                commandBuffer.draw(position.size(), 1, 0, 0);
-            }
+            commandBuffer.bindIndexBuffer(indexBuffer->buffer, 0, vk::IndexType::eUint32);
+            commandBuffer.bindVertexBuffers(0, validBuffers.size(), validBuffers.data(),
+                                            std::vector<vk::DeviceSize>(validBuffers.size(), 0).data());
+            commandBuffer.drawIndexed(index.size(), 1, 0, 0, 0);
         }
     };
 }; // namespace letc

@@ -200,6 +200,11 @@ namespace letc
         }
     };
 
+    class IPipeline
+    {
+
+    };
+
     struct GraphicsPipeline
     {
         const Device &device;
@@ -268,9 +273,4 @@ namespace letc
             }
         }
     };
-
-    class IPipeline
-    {
-    };
-
 }; // namespace letc

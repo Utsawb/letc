@@ -21,8 +21,8 @@ namespace letc
 {
     struct PointsRenderer
     {
-        const Allocator &allocator;
         const Device &device;
+        const Allocator &allocator;
 
         std::unique_ptr<DescriptorLayout> layout;
         std::unique_ptr<Material> material;
