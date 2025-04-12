@@ -14,6 +14,7 @@
 #include "Material.hh"
 #include "Pipeline.hh"
 #include "Swapchain.hh"
+#include "Renderable.hh"
 
 namespace letc
 {
@@ -227,6 +228,12 @@ namespace letc
             commandBuffer.drawIndexed(index.size(), 1, 0, 0, 0);
         }
     };
+    
+    struct Models : IRenderable
+    {
+
+    };
+
 }; // namespace letc
 
 #endif // LETC_MODEL_HH
