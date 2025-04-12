@@ -52,10 +52,7 @@ struct App
     std::vector<letc::Model> models;
     std::vector<letc::Model::UniformBuffer> modelUniforms{};
     std::unique_ptr<letc::Buffer> modelUniformsBuffer;
-
-    std::unique_ptr<letc::DescriptorLayout> pbrLayout;
-    std::unique_ptr<letc::Material> pbrMaterial;
-    std::unique_ptr<letc::GraphicsPipeline> pbrPipeline;
+    std::unique_ptr<letc::ModelRenderer> modelRenderer;
 
     std::unique_ptr<letc::Points> points;
     std::unique_ptr<letc::PointsRenderer> pointsRenderer;
@@ -150,42 +147,18 @@ struct App
             std::make_unique<letc::Buffer>(*allocator, sizeof(letc::Model::UniformBuffer) * models.size(),
                                            vk::BufferUsageFlagBits::eUniformBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-        // descriptor layout and material initialization
-        pbrLayout = std::make_unique<letc::DescriptorLayout>(*device);
-        pbrLayout->addBinding(0, 0, vk::DescriptorType::eUniformBuffer,
-                              vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 1);
-        pbrLayout->addBinding(0, 1, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eFragment, 1);
-        pbrLayout->addBinding(0, 2, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex, 1);
-        pbrLayout->addBinding(1, 0, vk::DescriptorType::eUniformBufferDynamic,
-                              vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 1);
-        pbrLayout->generateLayouts();
-
-        pbrMaterial = std::make_unique<letc::Material>(*device, *allocator, *pbrLayout);
-        pbrMaterial->updateDescriptorBufferInfo(0, 0, globalUniformsBuffer->buffer, 0, sizeof(GlobalUniforms));
-        pbrMaterial->updateDescriptorBufferInfo(0, 1, lightsBuffer->buffer, 0, sizeof(Light) * lights.size());
-        pbrMaterial->updateDescriptorBufferInfo(0, 2, *camera->buffer, 0, sizeof(letc::Camera::Uniform));
-        pbrMaterial->updateDescriptorBufferInfo(1, 0, modelUniformsBuffer->buffer, 0,
+        modelRenderer = std::make_unique<letc::ModelRenderer>(*allocator, *device, *swapchain,
+                                                              readFile(resourcePath / "pbr.vert.spv"),
+                                                              readFile(resourcePath / "pbr.frag.spv"));
+        
+        modelRenderer->material->updateDescriptorBufferInfo(0, 0, globalUniformsBuffer->buffer, 0, sizeof(GlobalUniforms));
+        modelRenderer->material->updateDescriptorBufferInfo(0, 1, lightsBuffer->buffer, 0, sizeof(Light) * lights.size());
+        modelRenderer->material->updateDescriptorBufferInfo(0, 2, *camera->buffer, 0, sizeof(letc::Camera::Uniform));
+        modelRenderer->material->updateDescriptorBufferInfo(1, 0, modelUniformsBuffer->buffer, 0,
                                                 sizeof(letc::Model::UniformBuffer));
-        pbrMaterial->updateDescriptorSets();
-        pbrMaterial->updateDynamicOffset(1, 0);
+        modelRenderer->material->updateDescriptorSets();
+        modelRenderer->material->updateDynamicOffset(1, 0);
 
-        // pipeline initialization
-        letc::GraphicsPipelineBuilder gpb;
-        gpb.addShaderStage(readFile(resourcePath / "pbr.vert.spv"), vk::ShaderStageFlagBits::eVertex);
-        gpb.addShaderStage(readFile(resourcePath / "pbr.frag.spv"), vk::ShaderStageFlagBits::eFragment);
-        gpb.addVertexInputBinding(0, sizeof(glm::vec4), vk::VertexInputRate::eVertex); // Position
-        gpb.addVertexInputAttribute(0, 0, vk::Format::eR32G32B32A32Sfloat, 0);
-        gpb.addVertexInputBinding(1, sizeof(glm::vec4), vk::VertexInputRate::eVertex); // Normal
-        gpb.addVertexInputAttribute(1, 1, vk::Format::eR32G32B32A32Sfloat, 0);
-        gpb.addVertexInputBinding(2, sizeof(glm::vec4), vk::VertexInputRate::eVertex); // Tangent
-        gpb.addVertexInputAttribute(2, 2, vk::Format::eR32G32B32A32Sfloat, 0);
-        gpb.addVertexInputBinding(3, sizeof(glm::vec2), vk::VertexInputRate::eVertex); // UV
-        gpb.addVertexInputAttribute(3, 3, vk::Format::eR32G32Sfloat, 0);
-        gpb.setLayout(pbrLayout.get());
-        gpb.renderingInfo.setColorAttachmentCount(1);
-        gpb.renderingInfo.setPColorAttachmentFormats(&swapchain->format.format);
-        gpb.setRasterization(gpb.rasterizationInfo.setCullMode(vk::CullModeFlagBits::eNone));
-        pbrPipeline = std::make_unique<letc::GraphicsPipeline>(*device, gpb);
 
         points = std::make_unique<letc::Points>(*allocator);
         pointsRenderer = std::make_unique<letc::PointsRenderer>(*allocator, *device, *swapchain,
@@ -264,7 +237,7 @@ struct App
         lightsBuffer->cpy(lights.data(), sizeof(Light) * lights.size());
         camera->cpy();
         modelUniformsBuffer->cpy(modelUniforms.data(), sizeof(letc::Model::UniformBuffer) * models.size());
-        pbrMaterial->updateDescriptorSets();
+        modelRenderer->material->updateDescriptorSets();
 
         points->cpy();
     }
@@ -276,8 +249,8 @@ struct App
         assertThrow(result == vk::Result::eSuccess, "failed to acquire next image: " + vk::to_string(result));
         m_currentImageIndex = imageIndex;
 
-        pbrMaterial->updateDescriptorBufferInfo(0, 2, *camera->buffer, 0, sizeof(letc::Camera::Uniform));
-        pbrMaterial->updateDescriptorSet(0);
+        modelRenderer->material->updateDescriptorBufferInfo(0, 2, *camera->buffer, 0, sizeof(letc::Camera::Uniform));
+        modelRenderer->material->updateDescriptorSet(0);
 
         pointsRenderer->material->updateDescriptorBufferInfo(0, 0, *camera->buffer, 0, sizeof(letc::Camera::Uniform));
         pointsRenderer->material->updateDescriptorSet(0);
@@ -362,14 +335,14 @@ struct App
 
         commandBuffer->beginRendering(renderingInfo);
 
-        pbrPipeline->bind(commandBuffer.get());
-        pbrMaterial->bind(commandBuffer.get(), *pbrPipeline);
+        modelRenderer->pipeline->bind(commandBuffer.get());
+        modelRenderer->material->bind(commandBuffer.get(), *modelRenderer->pipeline);
 
         for (uint32_t i = 0; i < models.size(); ++i)
         {
             uint32_t dynamicOffset = i * sizeof(letc::Model::UniformBuffer);
-            pbrMaterial->updateDynamicOffset(1, dynamicOffset);
-            pbrMaterial->bind(*commandBuffer, *pbrPipeline, 1);
+            modelRenderer->material->updateDynamicOffset(1, dynamicOffset);
+            modelRenderer->material->bind(*commandBuffer, *modelRenderer->pipeline, 1);
 
             models[i].draw(*commandBuffer);
         }

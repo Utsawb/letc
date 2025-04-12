@@ -3,7 +3,6 @@
 #ifndef LETC_MODEL_HH
 #define LETC_MODEL_HH
 
-#include <iostream>
 #include <memory>
 
 #include "pch.hh"
