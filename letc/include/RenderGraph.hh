@@ -11,6 +11,13 @@
 #include "Renderable.hh"
 #include "pch.hh"
 
+/*
+    Ok so idea timeeee
+        Pass:
+            IRenderable -> GPass 
+            Dispatch -> CPass
+*/
+
 namespace letc
 {
     struct RenderGraph

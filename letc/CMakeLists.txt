@@ -26,7 +26,7 @@ target_link_libraries(letc
         GPUOpen::VulkanMemoryAllocator
         assimp::assimp
         Eigen3::Eigen
-        Taskflow::Taskflow
+        # Taskflow::Taskflow
 )
 
 target_include_directories(letc

@@ -1,7 +1,6 @@
 #include "Allocator.hh"
 #include "Buffer.hh"
 #include "Camera.hh"
-#include "Descriptor.hh"
 #include "Device.hh"
 #include "Material.hh"
 #include "Model.hh"
@@ -10,7 +9,7 @@
 #include "Swapchain.hh"
 #include "Window.hh"
 
-std::filesystem::path resourcePath = "../resources/";
+std::filesystem::path resourcePath = "../../../resources";
 
 struct GlobalUniforms
 {
@@ -145,20 +144,20 @@ struct App
                       [this](const letc::Model &m) { modelUniforms.push_back(m.uniform); });
         modelUniformsBuffer =
             std::make_unique<letc::Buffer>(*allocator, sizeof(letc::Model::UniformBuffer) * models.size(),
-                                           vk::BufferUsageFlagBits::eUniformBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
+                                           vk::BufferUsageFlagBits::eStorageBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
         modelRenderer = std::make_unique<letc::ModelRenderer>(*allocator, *device, *swapchain,
                                                               readFile(resourcePath / "pbr.vert.spv"),
                                                               readFile(resourcePath / "pbr.frag.spv"));
-        
-        modelRenderer->material->updateDescriptorBufferInfo(0, 0, globalUniformsBuffer->buffer, 0, sizeof(GlobalUniforms));
-        modelRenderer->material->updateDescriptorBufferInfo(0, 1, lightsBuffer->buffer, 0, sizeof(Light) * lights.size());
+
+        modelRenderer->material->updateDescriptorBufferInfo(0, 0, globalUniformsBuffer->buffer, 0,
+                                                            sizeof(GlobalUniforms));
+        modelRenderer->material->updateDescriptorBufferInfo(0, 1, lightsBuffer->buffer, 0,
+                                                            sizeof(Light) * lights.size());
         modelRenderer->material->updateDescriptorBufferInfo(0, 2, *camera->buffer, 0, sizeof(letc::Camera::Uniform));
         modelRenderer->material->updateDescriptorBufferInfo(1, 0, modelUniformsBuffer->buffer, 0,
-                                                sizeof(letc::Model::UniformBuffer));
+                                                            sizeof(letc::Model::UniformBuffer) * modelUniforms.size());
         modelRenderer->material->updateDescriptorSets();
-        modelRenderer->material->updateDynamicOffset(1, 0);
-
 
         points = std::make_unique<letc::Points>(*allocator);
         pointsRenderer = std::make_unique<letc::PointsRenderer>(*allocator, *device, *swapchain,
@@ -340,10 +339,9 @@ struct App
 
         for (uint32_t i = 0; i < models.size(); ++i)
         {
-            uint32_t dynamicOffset = i * sizeof(letc::Model::UniformBuffer);
-            modelRenderer->material->updateDynamicOffset(1, dynamicOffset);
+            commandBuffer->pushConstants(modelRenderer->pipeline->layout, vk::ShaderStageFlagBits::eAllGraphics, 0,
+                                         sizeof(uint32_t), &i);
             modelRenderer->material->bind(*commandBuffer, *modelRenderer->pipeline, 1);
-
             models[i].draw(*commandBuffer);
         }
 

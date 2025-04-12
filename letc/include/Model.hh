@@ -35,7 +35,7 @@ namespace letc
                                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 1);
             layout->addBinding(0, 1, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eFragment, 1);
             layout->addBinding(0, 2, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex, 1);
-            layout->addBinding(1, 0, vk::DescriptorType::eUniformBufferDynamic,
+            layout->addBinding(1, 0, vk::DescriptorType::eStorageBuffer,
                                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 1);
             layout->generateLayouts();
 
@@ -52,6 +52,10 @@ namespace letc
             gpb.addVertexInputAttribute(2, 2, vk::Format::eR32G32B32A32Sfloat, 0);
             gpb.addVertexInputBinding(3, sizeof(glm::vec2), vk::VertexInputRate::eVertex); // UV
             gpb.addVertexInputAttribute(3, 3, vk::Format::eR32G32Sfloat, 0);
+            gpb.addPushConstantRange(vk::PushConstantRange{}
+                                         .setSize(sizeof(uint32_t))
+                                         .setOffset(0)
+                                         .setStageFlags(vk::ShaderStageFlagBits::eAllGraphics));
             gpb.setLayout(layout.get());
             gpb.renderingInfo.setColorAttachmentCount(1);
             gpb.renderingInfo.setPColorAttachmentFormats(&swapchain.format.format);
@@ -87,7 +91,6 @@ namespace letc
             glm::mat4 modelInvTranspose = glm::mat4(1.0f);
             glm::vec4 attributeFlags1 = glm::vec4(0.0f);
             glm::vec4 attributeFlags2 = glm::vec4(0.0f);
-            char padding[32] = {0};
         };
         UniformBuffer uniform;
 

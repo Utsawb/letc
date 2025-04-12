@@ -23,7 +23,7 @@ if(UseFindPackage)
     find_package(VulkanMemoryAllocator REQUIRED)
     find_package(assimp REQUIRED)
     find_package(Eigen3 REQUIRED)
-    find_package(Taskflow REQUIRED)
+    # find_package(Taskflow REQUIRED)
 else()
     FetchContent_Declare(
       openxr

@@ -31,12 +31,20 @@ layout(set = 0, binding = 2) uniform CameraUniforms {
     mat4 proj;
 } uCamera;
 
-layout(set = 1, binding = 0) uniform ModelUniforms {
+struct ModelUniform {
     mat4 model;
     mat4 modelInvTranspose;
     vec4 attributeFlags1;
     vec4 attributeFlags2;
-} uModel;
+};
+
+layout(set = 1, binding = 0) buffer ModelUniforms {
+    ModelUniform uModels[];
+};
+
+layout(push_constant, std430) uniform pc {
+    uint modelIndex;
+};
 
 // layout(set = 2, binding = 0) uniform MaterialUniforms {
 //     vec4 baseColor;
@@ -53,7 +61,7 @@ layout(location = 1) out vec4 vNormal;
 // layout(location = 4) out vec4 vColor;
 
 void main() {
-    vPosition = uModel.model * aPosition;
-    vNormal = uModel.modelInvTranspose * aNormal;
+    vPosition = uModels[modelIndex].model * aPosition;
+    vNormal = uModels[modelIndex].modelInvTranspose * aNormal;
     gl_Position = uCamera.proj * uCamera.view * vPosition;
 }
