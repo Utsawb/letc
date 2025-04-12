@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -14,7 +13,7 @@
 /*
     Ok so idea timeeee
         Pass:
-            IRenderable -> GPass 
+            IRenderable -> GPass
             Dispatch -> CPass
 */
 
@@ -25,15 +24,6 @@ namespace letc
         struct Resource
         {
             std::string id;
-
-            enum Type
-            {
-                PersistentBuffer,
-                PersistentImage,
-                TransientBuffer,
-                TransientImage
-            };
-
             virtual void initialize(const Device &device, const Allocator &allocator) = 0;
             virtual void destroy(const Device &device, const Allocator &allocator) = 0;
 
@@ -142,22 +132,64 @@ namespace letc
         struct Pass
         {
             std::string id;
-            std::vector<std::string> resourceSrc;
-            std::vector<std::string> resourceDst;
+            std::map<uint32_t, std::map<uint32_t, std::string>> resourceBindings;
+            std::unordered_map<std::string, std::variant<vk::BufferMemoryBarrier, vk::ImageMemoryBarrier>>
+                resourceBarriers;
 
-            virtual void setup(const RenderGraph& graph) = 0;
+            virtual void setup(const RenderGraph &graph) = 0;
             virtual void execute(vk::CommandBuffer &commandBuffer) = 0;
             virtual ~Pass() = default;
         };
 
         struct Graphics : Pass
         {
-            GraphicsPipeline &graphicsPipeline;
+            const GraphicsPipeline *graphicsPipeline = nullptr;
+            std::vector<IRenderable *> renderables;
+
+            Graphics(const std::string id, const GraphicsPipeline *graphicsPipeline)
+                : graphicsPipeline(graphicsPipeline)
+            {
+                this->id = id;
+            }
+
+            void setup(const RenderGraph &graph) override
+            {
+            }
+
+            void execute(vk::CommandBuffer &commandBuffer) override
+            {
+            }
         };
 
         const Device &device;
         const Allocator &allocator;
 
+        std::unordered_map<std::string, std::unique_ptr<Resource>> resources;
+        std::unordered_map<std::string, std::unique_ptr<Pass>> passes;
+
         RenderGraph(const Device &device, const Allocator &allocator) : device(device), allocator(allocator) {};
+
+        RenderGraph &addPersistentBuffer();
+
+        RenderGraph &addPersistentImage();
+
+        RenderGraph &addTransientBuffer();
+
+        RenderGraph &addTransientImage();
+
+        RenderGraph &addGraphicsPass(const std::string &id, const GraphicsPipeline *graphicsPipeline)
+        {
+            assertThrow(passes.find(id) == passes.end(), std::format("duplicate pass id: %s", id));
+            passes.emplace(id, std::make_unique<Graphics>(id, graphicsPipeline));
+            return *this;
+        }
+
+        ~RenderGraph()
+        {
+            for (auto &[id, resource] : resources)
+            {
+                resource->destroy(device, allocator);
+            }
+        }
     };
 }; // namespace letc

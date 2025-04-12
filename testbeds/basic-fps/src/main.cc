@@ -341,7 +341,6 @@ struct App
         {
             commandBuffer->pushConstants(modelRenderer->pipeline->layout, vk::ShaderStageFlagBits::eAllGraphics, 0,
                                          sizeof(uint32_t), &i);
-            modelRenderer->material->bind(*commandBuffer, *modelRenderer->pipeline, 1);
             models[i].draw(*commandBuffer);
         }
 
