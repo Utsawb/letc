@@ -3,6 +3,7 @@
 #include "Camera.hh"
 #include "Descriptor.hh"
 #include "Device.hh"
+#include "Image.hh"
 #include "Material.hh"
 #include "Model.hh"
 #include "Pipeline.hh"
@@ -60,7 +61,6 @@ struct App
     std::vector<vk::UniqueImageView> swapchainImageViews[2];
     xr::EventDataBuffer xrEventDataBuffer{};
     xr::SessionState xrSessionState = xr::SessionState::Unknown;
-    std::vector<std::unique_ptr<letc::Camera>> xrCameras;
 
     vk::UniqueCommandPool commandPool;
     std::vector<vk::UniqueCommandBuffer> commandBuffers;
@@ -75,23 +75,22 @@ struct App
     std::unique_ptr<letc::Buffer> lightsBuffer;
 
     std::unique_ptr<letc::Camera> camera;
+    std::vector<std::unique_ptr<letc::Camera>> xrCameras;
 
     std::vector<letc::Model> models;
     std::vector<letc::Model::UniformBuffer> modelUniforms{};
     std::unique_ptr<letc::Buffer> modelUniformsBuffer;
 
-    std::unique_ptr<letc::DescriptorLayout> pbrLayout;
-    std::unique_ptr<letc::Material> pbrMaterial;
-    std::unique_ptr<letc::GraphicsPipeline> pbrPipeline;
+    std::unique_ptr<letc::ModelRenderer> modelRenderer;
 
     std::unique_ptr<letc::Points> points;
     std::unique_ptr<letc::PointsRenderer> pointsRenderer;
 
-    std::unique_ptr<letc::ImageBuffer<float>> depthBuffer;
-    vk::UniqueImageView depthImageView;
+    std::unique_ptr<letc::Image> depthImage;         // Renamed from depthBuffer for consistency
+    std::unique_ptr<letc::ImageView> depthImageView; // Renamed for consistency
 
-    std::unique_ptr<letc::ImageBuffer<float>> xrDepthBuffer;
-    vk::UniqueImageView xrDepthImageView;
+    std::unique_ptr<letc::Image> xrDepthImage;         // Renamed from xrDepthBuffer for consistency
+    std::unique_ptr<letc::ImageView> xrDepthImageView; // Renamed for consistency
 
     double lastMouseX, lastMouseY;
 
@@ -408,117 +407,73 @@ struct App
             std::make_unique<letc::Buffer>(*allocator, sizeof(Light) * lights.size(),
                                            vk::BufferUsageFlagBits::eStorageBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
+        // Flat camera
         camera = std::make_unique<letc::Camera>(*allocator, glm::vec4{0.0f, 0.0f, 2.0f, 1.0f},
                                                 glm::vec4{0.0f, 0.0f, 0.0f, 1.0f}, glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
                                                 60.0f, (float)window->getWidth() / (float)window->getHeight());
 
+        // XR cameras
         for (int i = 0; i < 2; ++i)
         {
             xrCameras.push_back(std::make_unique<letc::Camera>(
                 *allocator, glm::vec4{0.0f, 0.0f, 2.0f, 1.0f}, glm::vec4{0.0f, 0.0f, 0.0f, 1.0f},
                 glm::vec4{0.0f, 1.0f, 0.0f, 1.0f}, 60.0f,
-                static_cast<float>(xrViewConfigurationViews.at(0).recommendedImageRectWidth) /
-                    static_cast<float>(xrViewConfigurationViews.at(0).recommendedImageRectHeight)));
+                static_cast<float>(xrViewConfigurationViews.at(i).recommendedImageRectWidth) /       // Use index i here
+                    static_cast<float>(xrViewConfigurationViews.at(i).recommendedImageRectHeight))); // Use index i here
         }
 
         models.emplace_back(*allocator, resourcePath / "Avocado.glb");
         models.emplace_back(*allocator, resourcePath / "pointy.glb");
-        models.emplace_back(*allocator, resourcePath / "Avocado.glb");
-        models.emplace_back(*allocator, resourcePath / "Avocado.glb");
+        models.emplace_back(*allocator, resourcePath / "Avocado.glb"); // Left Hand Model placeholder?
+        models.emplace_back(*allocator, resourcePath / "Avocado.glb"); // Right Hand Model placeholder?
+        // Remove extra models if not needed, or adjust indices later
         models.emplace_back(*allocator, resourcePath / "Avocado.glb");
         models.emplace_back(*allocator, resourcePath / "Avocado.glb");
 
         float modelScalingFactor = 10.0f;
         models.at(0).uniform.model *= glm::scale(models.at(0).uniform.model, glm::vec3(modelScalingFactor));
         models.at(1).uniform.model *= glm::scale(models.at(1).uniform.model, glm::vec3(modelScalingFactor));
+        // Scale hand models if necessary (models 2 and 3)
 
         std::for_each(models.begin(), models.end(), [](letc::Model &m) { m.cpyAttributes(); });
 
         std::for_each(models.begin(), models.end(),
                       [this](const letc::Model &m) { modelUniforms.push_back(m.uniform); });
+        // *** Use eStorageBuffer for SSBO ***
         modelUniformsBuffer =
             std::make_unique<letc::Buffer>(*allocator, sizeof(letc::Model::UniformBuffer) * models.size(),
-                                           vk::BufferUsageFlagBits::eUniformBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
+                                           vk::BufferUsageFlagBits::eStorageBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-        // descriptor layout and material initialization
-        pbrLayout = std::make_unique<letc::DescriptorLayout>(*device);
-        pbrLayout->addBinding(0, 0, vk::DescriptorType::eUniformBuffer,
-                              vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 1);
-        pbrLayout->addBinding(0, 1, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eFragment, 1);
-        pbrLayout->addBinding(0, 2, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex, 1);
-        pbrLayout->addBinding(1, 0, vk::DescriptorType::eUniformBufferDynamic,
-                              vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 1);
-        pbrLayout->generateLayouts();
+        // *** Initialize ModelRenderer ***
+        modelRenderer = std::make_unique<letc::ModelRenderer>(*allocator, *device, *swapchain,
+                                                              readFile(resourcePath / "pbr.vert.spv"),
+                                                              readFile(resourcePath / "pbr.frag.spv"));
 
-        pbrMaterial = std::make_unique<letc::Material>(*device, *allocator, *pbrLayout);
-        pbrMaterial->updateDescriptorBufferInfo(0, 0, globalUniformsBuffer->buffer, 0, sizeof(GlobalUniforms));
-        pbrMaterial->updateDescriptorBufferInfo(0, 1, lightsBuffer->buffer, 0, sizeof(Light) * lights.size());
-        pbrMaterial->updateDescriptorBufferInfo(0, 2, *camera->buffer, 0, sizeof(letc::Camera::Uniform));
-        pbrMaterial->updateDescriptorBufferInfo(1, 0, modelUniformsBuffer->buffer, 0,
-                                                sizeof(letc::Model::UniformBuffer));
-        pbrMaterial->updateDescriptorSets();
-        pbrMaterial->updateDynamicOffset(1, 0);
-
-        // pipeline initialization
-        letc::GraphicsPipelineBuilder gpb;
-        gpb.addShaderStage(readFile(resourcePath / "pbr.vert.spv"), vk::ShaderStageFlagBits::eVertex);
-        gpb.addShaderStage(readFile(resourcePath / "pbr.frag.spv"), vk::ShaderStageFlagBits::eFragment);
-        gpb.addVertexInputBinding(0, sizeof(glm::vec4), vk::VertexInputRate::eVertex); // Position
-        gpb.addVertexInputAttribute(0, 0, vk::Format::eR32G32B32A32Sfloat, 0);
-        gpb.addVertexInputBinding(1, sizeof(glm::vec4), vk::VertexInputRate::eVertex); // Normal
-        gpb.addVertexInputAttribute(1, 1, vk::Format::eR32G32B32A32Sfloat, 0);
-        gpb.addVertexInputBinding(2, sizeof(glm::vec4), vk::VertexInputRate::eVertex); // Tangent
-        gpb.addVertexInputAttribute(2, 2, vk::Format::eR32G32B32A32Sfloat, 0);
-        gpb.addVertexInputBinding(3, sizeof(glm::vec2), vk::VertexInputRate::eVertex); // UV
-        gpb.addVertexInputAttribute(3, 3, vk::Format::eR32G32Sfloat, 0);
-        gpb.setLayout(pbrLayout.get());
-        gpb.renderingInfo.setColorAttachmentCount(1);
-        gpb.renderingInfo.setPColorAttachmentFormats(&swapchain->format.format);
-        gpb.setRasterization(gpb.rasterizationInfo.setCullMode(vk::CullModeFlagBits::eNone));
-        pbrPipeline = std::make_unique<letc::GraphicsPipeline>(*device, gpb);
+        // *** Update ModelRenderer's descriptor sets ***
+        modelRenderer->material->updateDescriptorBufferInfo(0, 0, globalUniformsBuffer->buffer, 0,
+                                                            sizeof(GlobalUniforms));
+        modelRenderer->material->updateDescriptorBufferInfo(0, 1, lightsBuffer->buffer, 0,
+                                                            sizeof(Light) * lights.size());
+        // Initial camera binding (will be updated per frame)
+        modelRenderer->material->updateDescriptorBufferInfo(0, 2, *camera->buffer, 0, sizeof(letc::Camera::Uniform));
+        // Binding for the SSBO
+        modelRenderer->material->updateDescriptorBufferInfo(1, 0, modelUniformsBuffer->buffer, 0,
+                                                            sizeof(letc::Model::UniformBuffer) * modelUniforms.size());
+        modelRenderer->material->updateDescriptorSets(); // Update all sets once
 
         points = std::make_unique<letc::Points>(*allocator);
         pointsRenderer = std::make_unique<letc::PointsRenderer>(*allocator, *device, *swapchain,
                                                                 readFile(resourcePath / "points.vert.spv"),
                                                                 readFile(resourcePath / "points.frag.spv"));
 
-        // depth buffer initialization
-        depthBuffer = std::make_unique<letc::ImageBuffer<float>>(
-            allocator->allocator, static_cast<uint32_t>(window->getWidth()), static_cast<uint32_t>(window->getHeight()),
-            vk::Format::eD32Sfloat, std::vector<float>(window->getWidth() * window->getHeight(), 0.0f),
-            vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::ImageTiling::eOptimal);
+        // depth buffer initialization (flat)
+        depthImage = letc::laconic::depthImage(allocator->allocator, window->getWidth(), window->getHeight());
+        depthImageView = letc::laconic::depthImageView(*device, *depthImage);
 
-        depthImageView = device->device.createImageViewUnique(
-            vk::ImageViewCreateInfo{}
-                .setImage(depthBuffer->m_gpuImage)
-                .setViewType(vk::ImageViewType::e2D)
-                .setFormat(vk::Format::eD32Sfloat)
-                .setSubresourceRange(vk::ImageSubresourceRange{}
-                                         .setAspectMask(vk::ImageAspectFlagBits::eDepth)
-                                         .setBaseMipLevel(0)
-                                         .setLevelCount(1)
-                                         .setBaseArrayLayer(0)
-                                         .setLayerCount(1)));
-
-        // make an xr depth buffer that uses the xrSwapchain dimentions
-        xrDepthBuffer = std::make_unique<letc::ImageBuffer<float>>(
-            allocator->allocator, static_cast<uint32_t>(xrViewConfigurationViews.at(0).recommendedImageRectWidth),
-            static_cast<uint32_t>(xrViewConfigurationViews.at(0).recommendedImageRectHeight), vk::Format::eD32Sfloat,
-            std::vector<float>(window->getWidth() * window->getHeight(), 0.0f),
-            vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eTransferSrc,
-            vk::ImageTiling::eOptimal);
-
-        xrDepthImageView = device->device.createImageViewUnique(
-            vk::ImageViewCreateInfo{}
-                .setImage(xrDepthBuffer->m_gpuImage)
-                .setViewType(vk::ImageViewType::e2D)
-                .setFormat(vk::Format::eD32Sfloat)
-                .setSubresourceRange(vk::ImageSubresourceRange{}
-                                         .setAspectMask(vk::ImageAspectFlagBits::eDepth)
-                                         .setBaseMipLevel(0)
-                                         .setLevelCount(1)
-                                         .setBaseArrayLayer(0)
-                                         .setLayerCount(1)));
+        xrDepthImage =
+            letc::laconic::depthImage(allocator->allocator, xrViewConfigurationViews.at(0).recommendedImageRectWidth,
+                                      xrViewConfigurationViews.at(0).recommendedImageRectHeight);
+        xrDepthImageView = letc::laconic::depthImageView(*device, *xrDepthImage);
 
         std::tie(lastMouseX, lastMouseY) = window->getCursorPos();
         window->callbacks()->on_scroll = [this](vkfw::Window const &, double x, double y) {
@@ -627,8 +582,8 @@ struct App
         for (size_t i = 0; i < lights.size(); ++i)
         {
             float angle = globalUniforms.time + static_cast<float>(i) * glm::pi<float>() / 2.0f;
-            lights[i].position.x = 2.0f * cos(angle);
-            lights[i].position.z = 2.0f * sin(angle);
+            lights[i].position.x = 4.0f * cos(angle); // Using 4.0f like non-xr, adjust if needed
+            lights[i].position.z = 4.0f * sin(angle); // Using 4.0f like non-xr, adjust if needed
         }
 
         // --- Query OpenXR action states ---
@@ -728,10 +683,19 @@ struct App
             faceButtonPressed('A'); // Right hand binding mapped to "A"
         }
 
+        // --- Update modelUniforms SSBO data ---
         for (size_t i = 0; i < models.size(); ++i)
         {
             modelUniforms[i].model = models[i].uniform.model;
-            modelUniforms[i].modelInvTranspose = glm::transpose(glm::inverse(models[i].uniform.model));
+            glm::mat4 invModel = glm::inverse(models[i].uniform.model);
+            if (glm::determinant(models[i].uniform.model) != 0.0f)
+            {
+                modelUniforms[i].modelInvTranspose = glm::transpose(invModel);
+            }
+            else
+            {
+                modelUniforms[i].modelInvTranspose = glm::mat4(1.0f); // Identity or handle error
+            }
         }
     }
 
@@ -739,10 +703,12 @@ struct App
     {
         globalUniformsBuffer->cpy(&globalUniforms, sizeof(GlobalUniforms));
         lightsBuffer->cpy(lights.data(), sizeof(Light) * lights.size());
-        camera->cpy();
+        camera->cpy(); // Flat camera
         modelUniformsBuffer->cpy(modelUniforms.data(), sizeof(letc::Model::UniformBuffer) * models.size());
-        pbrMaterial->updateDescriptorSets();
 
+        // *** No need to update modelRenderer descriptor sets here unless ***
+        // *** global/light/model SSBO buffer bindings change, which they don't per frame ***
+        modelRenderer->material->updateDescriptorSets(); // Remove this
         points->cpy();
     }
 
@@ -810,7 +776,6 @@ struct App
             }
 
             modelUniformsBuffer->cpy(modelUniforms.data(), sizeof(letc::Model::UniformBuffer) * models.size());
-            pbrMaterial->updateDescriptorSet(0);
         }
 
         std::vector<xr::CompositionLayerProjectionView> projectionViews(viewCount);
@@ -825,9 +790,12 @@ struct App
             uint32_t eyeWidth = xrViewConfigurationViews.at(eye).recommendedImageRectWidth;
             uint32_t eyeHeight = xrViewConfigurationViews.at(eye).recommendedImageRectHeight;
 
-            pbrMaterial->updateDescriptorBufferInfo(0, 2, *xrCameras[eye]->buffer, 0, sizeof(letc::Camera::Uniform));
-            pbrMaterial->updateDescriptorSet(0);
+            // *** Update ModelRenderer camera binding for the current eye ***
+            modelRenderer->material->updateDescriptorBufferInfo(0, 2, *xrCameras[eye]->buffer, 0,
+                                                                sizeof(letc::Camera::Uniform));
+            modelRenderer->material->updateDescriptorSet(0); // Only update set 0 (camera)
 
+            // Update PointsRenderer camera binding
             pointsRenderer->material->updateDescriptorBufferInfo(0, 0, *xrCameras[eye]->buffer, 0,
                                                                  sizeof(letc::Camera::Uniform));
             pointsRenderer->material->updateDescriptorSet(0);
@@ -841,33 +809,19 @@ struct App
             vk::Viewport viewport(0.0f, 0.0f, static_cast<float>(eyeWidth), static_cast<float>(eyeHeight), 0.0f, 1.0f);
             commandBuffer->setViewport(0, 1, &viewport);
 
-            vk::ImageMemoryBarrier colorBarrier{};
-            colorBarrier.setSrcAccessMask(vk::AccessFlags{});
-            colorBarrier.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
-            colorBarrier.setOldLayout(vk::ImageLayout::eUndefined);
-            colorBarrier.setNewLayout(vk::ImageLayout::eColorAttachmentOptimal);
-            colorBarrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-            colorBarrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-            colorBarrier.setImage(xrSwapchainImageVk[eye][xrImageIndex].image);
-            colorBarrier.setSubresourceRange(vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
-
-            vk::ImageMemoryBarrier depthBarrier{};
-            depthBarrier.setSrcAccessMask(vk::AccessFlags{});
-            depthBarrier.setDstAccessMask(vk::AccessFlagBits::eDepthStencilAttachmentRead |
-                                          vk::AccessFlagBits::eDepthStencilAttachmentWrite);
-            depthBarrier.setOldLayout(vk::ImageLayout::eUndefined);
-            depthBarrier.setNewLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
-            depthBarrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-            depthBarrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-            depthBarrier.setImage(xrDepthBuffer->m_gpuImage);
-            depthBarrier.setSubresourceRange(vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1});
-
-            commandBuffer->pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-                                           vk::PipelineStageFlagBits::eEarlyFragmentTests, {}, 0, nullptr, 0, nullptr,
-                                           1, &depthBarrier);
-            commandBuffer->pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-                                           vk::PipelineStageFlagBits::eColorAttachmentOutput, {}, 0, nullptr, 0,
-                                           nullptr, 1, &colorBarrier);
+            // color attachment layout transition
+            letc::laconic::transitionImageLayout(
+                *commandBuffer, xrSwapchainImageVk[eye][xrImageIndex].image, vk::ImageAspectFlagBits::eColor,
+                vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::AccessFlags{},
+                vk::AccessFlagBits::eColorAttachmentWrite, vk::PipelineStageFlagBits::eTopOfPipe,
+                vk::PipelineStageFlagBits::eColorAttachmentOutput);
+            // depth attachment layout transition (XR depth image)
+            letc::laconic::transitionImageLayout(
+                *commandBuffer, *xrDepthImage, vk::ImageAspectFlagBits::eDepth,
+                vk::ImageLayout::eUndefined, // Use xrDepthImage
+                vk::ImageLayout::eDepthStencilAttachmentOptimal, vk::AccessFlags{},
+                vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+                vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eEarlyFragmentTests);
 
             vk::RenderingInfo renderingInfo{};
             renderingInfo.setRenderArea({{0, 0}, {eyeWidth, eyeHeight}});
@@ -882,7 +836,7 @@ struct App
                 vk::ClearValue{}.setColor(vk::ClearColorValue{}.setFloat32({0.1176f, 0.1176f, 0.1804f, 1.0f})));
 
             vk::RenderingAttachmentInfo depthAttachment{};
-            depthAttachment.setImageView(xrDepthImageView.get());
+            depthAttachment.setImageView(*xrDepthImageView);
             depthAttachment.setImageLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
             depthAttachment.setLoadOp(vk::AttachmentLoadOp::eClear);
             depthAttachment.setStoreOp(vk::AttachmentStoreOp::eDontCare);
@@ -894,13 +848,13 @@ struct App
 
             commandBuffer->beginRendering(renderingInfo);
 
-            pbrPipeline->bind(commandBuffer.get());
-            pbrMaterial->bind(commandBuffer.get(), *pbrPipeline);
-            for (uint32_t i = 0; i < 4; ++i)
+            // *** Render models using ModelRenderer and push constants ***
+            modelRenderer->pipeline->bind(commandBuffer.get());
+            modelRenderer->material->bind(commandBuffer.get(), *modelRenderer->pipeline); // Bind all descriptor sets
+            for (uint32_t i = 0; i < models.size(); ++i)                                  // Render all models
             {
-                uint32_t dynamicOffset = i * sizeof(letc::Model::UniformBuffer);
-                pbrMaterial->updateDynamicOffset(1, dynamicOffset);
-                pbrMaterial->bind(*commandBuffer, *pbrPipeline, 1);
+                commandBuffer->pushConstants(modelRenderer->pipeline->layout, vk::ShaderStageFlagBits::eAllGraphics, 0,
+                                             sizeof(uint32_t), &i);
                 models[i].draw(*commandBuffer);
             }
 
@@ -910,19 +864,12 @@ struct App
 
             commandBuffer->endRendering();
 
-            vk::ImageMemoryBarrier presentBarrier{};
-            presentBarrier.setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
-            presentBarrier.setDstAccessMask(vk::AccessFlagBits::eMemoryRead);
-            presentBarrier.setOldLayout(vk::ImageLayout::eColorAttachmentOptimal);
-            presentBarrier.setNewLayout(vk::ImageLayout::eColorAttachmentOptimal);
-            presentBarrier.setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-            presentBarrier.setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED);
-            presentBarrier.setImage(xrSwapchainImageVk[eye][xrImageIndex].image);
-            presentBarrier.setSubresourceRange(vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
-
-            commandBuffer->pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                                           vk::PipelineStageFlagBits::eBottomOfPipe, {}, 0, nullptr, 0, nullptr, 1,
-                                           &presentBarrier);
+            // color attachment layout transition
+            letc::laconic::transitionImageLayout(
+                *commandBuffer, xrSwapchainImageVk[eye][xrImageIndex].image, vk::ImageAspectFlagBits::eColor,
+                vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR,
+                vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eMemoryRead,
+                vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eBottomOfPipe);
 
             commandBuffer->end();
 
@@ -968,8 +915,9 @@ struct App
         assertThrow(result == vk::Result::eSuccess, "failed to acquire next image: " + vk::to_string(result));
         m_currentImageIndex = imageIndex;
 
-        pbrMaterial->updateDescriptorBufferInfo(0, 2, *camera->buffer, 0, sizeof(letc::Camera::Uniform));
-        pbrMaterial->updateDescriptorSet(0);
+        // *** Update ModelRenderer camera binding for the flat view ***
+        modelRenderer->material->updateDescriptorBufferInfo(0, 2, *camera->buffer, 0, sizeof(letc::Camera::Uniform));
+        modelRenderer->material->updateDescriptorSet(0); // Only update set 0 (camera)
 
         pointsRenderer->material->updateDescriptorBufferInfo(0, 0, *camera->buffer, 0, sizeof(letc::Camera::Uniform));
         pointsRenderer->material->updateDescriptorSet(0);
@@ -990,43 +938,18 @@ struct App
                                         .setMinDepth(0.0f)
                                         .setMaxDepth(1.0f));
 
-        vk::ImageMemoryBarrier colorBarrier{};
-        colorBarrier.setSrcAccessMask(vk::AccessFlags{});
-        colorBarrier.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
-        colorBarrier.setOldLayout(vk::ImageLayout::eUndefined);
-        colorBarrier.setNewLayout(vk::ImageLayout::eColorAttachmentOptimal);
-        colorBarrier.setSrcQueueFamilyIndex(vk::QueueFamilyIgnored);
-        colorBarrier.setDstQueueFamilyIndex(vk::QueueFamilyIgnored);
-        colorBarrier.setImage(swapchain->images.at(m_currentImageIndex));
-        colorBarrier.setSubresourceRange(vk::ImageSubresourceRange{}
-                                             .setAspectMask(vk::ImageAspectFlagBits::eColor)
-                                             .setBaseMipLevel(0)
-                                             .setLevelCount(1)
-                                             .setBaseArrayLayer(0)
-                                             .setLayerCount(1));
-
-        vk::ImageMemoryBarrier depthBarrier{};
-        depthBarrier.setSrcAccessMask(vk::AccessFlags{});
-        depthBarrier.setDstAccessMask(vk::AccessFlagBits::eDepthStencilAttachmentRead |
-                                      vk::AccessFlagBits::eDepthStencilAttachmentWrite);
-        depthBarrier.setOldLayout(vk::ImageLayout::eUndefined);
-        depthBarrier.setNewLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
-        depthBarrier.setSrcQueueFamilyIndex(vk::QueueFamilyIgnored);
-        depthBarrier.setDstQueueFamilyIndex(vk::QueueFamilyIgnored);
-        depthBarrier.setImage(depthBuffer->m_gpuImage);
-        depthBarrier.setSubresourceRange(vk::ImageSubresourceRange{}
-                                             .setAspectMask(vk::ImageAspectFlagBits::eDepth)
-                                             .setBaseMipLevel(0)
-                                             .setLevelCount(1)
-                                             .setBaseArrayLayer(0)
-                                             .setLayerCount(1));
-
-        commandBuffer->pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-                                       vk::PipelineStageFlagBits::eEarlyFragmentTests, {}, 0, nullptr, 0, nullptr, 1,
-                                       &depthBarrier);
-        commandBuffer->pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-                                       vk::PipelineStageFlagBits::eColorAttachmentOutput, {}, 0, nullptr, 0, nullptr, 1,
-                                       &colorBarrier);
+        // color attachment layout transition
+        letc::laconic::transitionImageLayout(
+            *commandBuffer, swapchain->images.at(m_currentImageIndex), vk::ImageAspectFlagBits::eColor,
+            vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::AccessFlags{},
+            vk::AccessFlagBits::eColorAttachmentWrite, vk::PipelineStageFlagBits::eTopOfPipe,
+            vk::PipelineStageFlagBits::eColorAttachmentOutput);
+        // depth attachment layout transition
+        letc::laconic::transitionImageLayout(
+            *commandBuffer, *depthImage, vk::ImageAspectFlagBits::eDepth, vk::ImageLayout::eUndefined, // Use depthImage
+            vk::ImageLayout::eDepthStencilAttachmentOptimal, vk::AccessFlags{},
+            vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+            vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eEarlyFragmentTests);
 
         vk::RenderingInfo renderingInfo{};
         renderingInfo.setRenderArea(vk::Rect2D{}.setOffset({0, 0}).setExtent(
@@ -1054,15 +977,15 @@ struct App
 
         commandBuffer->beginRendering(renderingInfo);
 
-        pbrPipeline->bind(commandBuffer.get());
-        pbrMaterial->bind(commandBuffer.get(), *pbrPipeline);
+        // *** Render models using ModelRenderer and push constants ***
+        modelRenderer->pipeline->bind(commandBuffer.get());
+        modelRenderer->material->bind(commandBuffer.get(), *modelRenderer->pipeline);
 
-        for (uint32_t i = 0; i < models.size(); ++i)
+        for (uint32_t i = 0; i < models.size(); ++i) // Render all models
         {
-            uint32_t dynamicOffset = i * sizeof(letc::Model::UniformBuffer);
-            pbrMaterial->updateDynamicOffset(1, dynamicOffset);
-            pbrMaterial->bind(*commandBuffer, *pbrPipeline, 1);
-
+            // Push the model index
+            commandBuffer->pushConstants(modelRenderer->pipeline->layout, vk::ShaderStageFlagBits::eAllGraphics, 0,
+                                         sizeof(uint32_t), &i);
             models[i].draw(*commandBuffer);
         }
 
@@ -1072,22 +995,12 @@ struct App
 
         commandBuffer->endRendering();
 
-        commandBuffer->pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                                       vk::PipelineStageFlagBits::eBottomOfPipe, {}, 0, nullptr, 0, nullptr, 1,
-                                       &vk::ImageMemoryBarrier{}
-                                            .setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite)
-                                            .setDstAccessMask(vk::AccessFlagBits::eMemoryRead)
-                                            .setOldLayout(vk::ImageLayout::eColorAttachmentOptimal)
-                                            .setNewLayout(vk::ImageLayout::ePresentSrcKHR)
-                                            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-                                            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-                                            .setImage(swapchain->images.at(m_currentImageIndex))
-                                            .setSubresourceRange(vk::ImageSubresourceRange{}
-                                                                     .setAspectMask(vk::ImageAspectFlagBits::eColor)
-                                                                     .setBaseMipLevel(0)
-                                                                     .setLevelCount(1)
-                                                                     .setBaseArrayLayer(0)
-                                                                     .setLayerCount(1)));
+        // color attachment layout transition
+        letc::laconic::transitionImageLayout(
+            *commandBuffer, swapchain->images.at(m_currentImageIndex), vk::ImageAspectFlagBits::eColor,
+            vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR,
+            vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eMemoryRead,
+            vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eBottomOfPipe);
 
         commandBuffer->end();
 

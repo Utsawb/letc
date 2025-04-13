@@ -262,9 +262,7 @@ struct App
             *commandBuffer, swapchain->images.at(m_currentImageIndex), vk::ImageAspectFlagBits::eColor,
             vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::AccessFlags{},
             vk::AccessFlagBits::eColorAttachmentWrite, vk::PipelineStageFlagBits::eTopOfPipe,
-            vk::PipelineStageFlagBits::eColorAttachmentOutput
-
-        );
+            vk::PipelineStageFlagBits::eColorAttachmentOutput);
         // depth attachment layout transition
         letc::laconic::transitionImageLayout(
             *commandBuffer, *depthImage, vk::ImageAspectFlagBits::eDepth, vk::ImageLayout::eUndefined,
@@ -313,12 +311,13 @@ struct App
         points->draw(*commandBuffer);
 
         commandBuffer->endRendering();
-        
+
         // color attachment layout transition
-        letc::laconic::transitionImageLayout(*commandBuffer, swapchain->images.at(m_currentImageIndex), 
-                                            vk::ImageAspectFlagBits::eColor, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR,
-                                            vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eMemoryRead, vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                                            vk::PipelineStageFlagBits::eBottomOfPipe);
+        letc::laconic::transitionImageLayout(
+            *commandBuffer, swapchain->images.at(m_currentImageIndex), vk::ImageAspectFlagBits::eColor,
+            vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR,
+            vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eMemoryRead,
+            vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eBottomOfPipe);
 
         commandBuffer->end();
 
