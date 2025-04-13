@@ -2,6 +2,7 @@
 #include "Buffer.hh"
 #include "Camera.hh"
 #include "Device.hh"
+#include "Laconic.hh"
 #include "Material.hh"
 #include "Model.hh"
 #include "Pipeline.hh"

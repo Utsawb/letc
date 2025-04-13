@@ -13,8 +13,8 @@
 #include "Device.hh"
 #include "Material.hh"
 #include "Pipeline.hh"
-#include "Swapchain.hh"
 #include "Renderable.hh"
+#include "Swapchain.hh"
 
 namespace letc
 {
@@ -228,12 +228,58 @@ namespace letc
             commandBuffer.drawIndexed(index.size(), 1, 0, 0, 0);
         }
     };
-    
+
     struct Models : IRenderable
     {
+        std::vector<std::unique_ptr<Model>> models;
+        std::unique_ptr<BufferVector<Model::UniformBuffer>> uniforms;
+        vk::PipelineLayout layout;
 
+        Models(const Allocator &allocator, const std::size_t &size)
+        {
+            uniforms = std::make_unique<BufferVector<Model::UniformBuffer>>(
+                allocator, size * sizeof(Model::UniformBuffer), vk::BufferUsageFlagBits::eStorageBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        }
+
+        void addModel(std::unique_ptr<Model> model)
+        {
+            models.push_back(std::move(model));
+            uniforms->vector.resize(models.size());
+        }
+
+        void updateUniforms()
+        {
+            for (size_t i = 0; i < models.size(); ++i)
+            {
+                uniforms->vector[i] = models[i]->uniform;
+            }
+            uniforms->sync();
+        }
+
+        void sync()
+        {
+            updateUniforms();
+            for (auto &m : models)
+            {
+                m->cpyAttributes();
+            }
+        }
+
+        void addLayout(vk::PipelineLayout &layout)
+        {
+            this->layout = layout;
+        }
+
+        virtual void draw(const vk::CommandBuffer &commandBuffer) override
+        {
+            updateUniforms();
+            for (uint32_t i = 0; i < models.size(); ++i)
+            {
+                commandBuffer.pushConstants(layout, vk::ShaderStageFlagBits::eAllGraphics, 0, sizeof(uint32_t), &i);
+                models.at(i)->draw(commandBuffer);
+            }
+        }
     };
-
 }; // namespace letc
 
 #endif // LETC_MODEL_HH

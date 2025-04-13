@@ -112,12 +112,13 @@ namespace letc
 
         struct TransientImageView : Resource
         {
-            vk::ImageViewCreateInfo imageViewInfo = {};
+            std::string imageId;
             vk::ImageView imageView = nullptr;
+            vk::ImageViewCreateInfo viewCreateInfo = {};
 
             void initialize(const Device &device, const Allocator &allocator) override
             {
-                imageView = device.device.createImageView(imageViewInfo);
+                imageView = device.device.createImageView(viewCreateInfo);
             }
 
             void destroy(const Device &device, const Allocator &allocator) override
@@ -226,6 +227,31 @@ namespace letc
         {
             assert(passes.find(id) == passes.end() && "duplicate pass id");
             passes.emplace(id, std::make_unique<Graphics>(id, graphicsPipeline));
+            return *this;
+        }
+
+        RenderGraph &addPersistentImageView(const std::string &id, const std::string &sourceImageId,
+                                            const vk::ImageView &view)
+        {
+            assert(resources.find(id) == resources.end() && "duplicate persistent image view id");
+            auto piv = std::make_unique<PersistentImageView>();
+            piv->id = id;
+            piv->imageId = sourceImageId;
+            piv->imageView = view;
+            resources.emplace(id, std::move(piv));
+            return *this;
+        }
+
+        // Add a transient image view.
+        RenderGraph &addTransientImageView(const std::string &id, const std::string &srcImageId,
+                                           const vk::ImageViewCreateInfo &viewCreateInfo)
+        {
+            assert(resources.find(id) == resources.end() && "duplicate transient image view id");
+            auto tiv = std::make_unique<TransientImageView>();
+            tiv->id = id;
+            tiv->imageId = srcImageId;
+            tiv->viewCreateInfo = viewCreateInfo;
+            resources.emplace(id, std::move(tiv));
             return *this;
         }
 

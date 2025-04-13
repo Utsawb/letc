@@ -26,8 +26,6 @@ namespace letc
 {
     struct IRenderable
     {
-        virtual void bindBuffers(const vk::CommandBuffer &commandBuffer) = 0;
-
         virtual void draw(const vk::CommandBuffer &commandBuffer) = 0;
 
         virtual ~IRenderable() = default;
