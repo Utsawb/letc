@@ -62,6 +62,11 @@ namespace letc
         vk::Device device;
         std::unordered_map<std::string, Queue> queues;
 
+        operator const vk::Device &()
+        {
+            return device;
+        }
+
         Device(const Instance &instance, const DeviceBuilder &builder) : instance(instance), deviceBuilder(builder)
         {
             if (deviceBuilder.physicalDevice.has_value())

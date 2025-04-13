@@ -1,0 +1,18 @@
+{
+    "$schema": "./pipeline.schema.json",
+    "vertexShader": "shaders/vertex.spv",
+    "fragmentShader": "shaders/fragment.spv",
+    "layout": {
+        "bindings": [
+            {
+                "binding": 0,
+                "descriptorType": "VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER",
+                "descriptorCount": 1,
+                "stageFlags": "VK_SHADER_STAGE_VERTEX_BIT"
+            },
+            {
+                "binding" : 
+            }
+        ]
+    }
+}

@@ -1,0 +1,154 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Vulkan Pipeline Configuration",
+    "description": "Schema for defining Vulkan graphics or compute pipelines.",
+    "type": "object",
+    "definitions": {
+        "vkPrimitiveTopology": {
+            "type": "string",
+            "description": "Vulkan Primitive Topology (VkPrimitiveTopology)",
+            "enum": [
+                "POINT_LIST",
+                "LINE_LIST",
+                "LINE_STRIP",
+                "TRIANGLE_LIST",
+                "TRIANGLE_STRIP",
+                "TRIANGLE_FAN",
+                "LINE_LIST_WITH_ADJACENCY",
+                "LINE_STRIP_WITH_ADJACENCY",
+                "TRIANGLE_LIST_WITH_ADJACENCY",
+                "TRIANGLE_STRIP_WITH_ADJACENCY",
+                "PATCH_LIST"
+            ]
+        },
+        "vkPolygonMode": {
+            "type": "string",
+            "description": "Vulkan Polygon Mode (VkPolygonMode)",
+            "enum": [
+                "FILL",
+                "LINE",
+                "POINT"
+            ]
+        },
+        // ... define other enums like VkFormat, VkCompareOp, VkBlendFactor etc.
+        "shaderStage": {
+            "type": "object",
+            "properties": {
+                "stage": {
+                    "type": "string",
+                    "enum": [
+                        "VERTEX",
+                        "FRAGMENT",
+                        "GEOMETRY",
+                        "TESSELLATION_CONTROL",
+                        "TESSELLATION_EVALUATION",
+                        "COMPUTE"
+                    ],
+                    "description": "Shader stage (VkShaderStageFlagBits)"
+                },
+                "shaderPath": {
+                    "type": "string",
+                    "description": "Path to the compiled SPIR-V (.spv) shader file."
+                }
+            },
+            "required": [
+                "stage",
+                "shaderPath"
+            ]
+        }
+        // ... define other complex types like vertexInputState, rasterizationState etc.
+    },
+    "properties": {
+        "name": {
+            "type": "string",
+            "description": "An internal name for this pipeline configuration."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "GRAPHICS",
+                "COMPUTE"
+            ],
+            "description": "Type of the pipeline."
+        },
+        "shaderStages": {
+            "type": "array",
+            "description": "Shader stages for the pipeline.",
+            "items": {
+                "$ref": "#/definitions/shaderStage"
+            }
+        },
+        "vertexInputState": {
+            // ... definition matching VkPipelineVertexInputStateCreateInfo structure
+        },
+        "inputAssemblyState": {
+            "type": "object",
+            "properties": {
+                "topology": {
+                    "$ref": "#/definitions/vkPrimitiveTopology"
+                },
+                "primitiveRestartEnable": {
+                    "type": "boolean",
+                    "default": false
+                }
+            },
+            "required": [
+                "topology"
+            ]
+        },
+        "rasterizationState": {
+            // ... definition matching VkPipelineRasterizationStateCreateInfo structure
+            // Use $ref for enums like polygonMode, cullMode, frontFace
+        },
+        // ... definitions for viewportState, multisampleState, depthStencilState, colorBlendState etc.
+        "dynamicStates": {
+            "type": "array",
+            "description": "States that will be set dynamically.",
+            "items": {
+                "type": "string",
+                "enum": [ // List all possible VkDynamicState values as strings
+                    "VIEWPORT",
+                    "SCISSOR",
+                    "LINE_WIDTH",
+                    "DEPTH_BIAS",
+                    "BLEND_CONSTANTS",
+                    "DEPTH_BOUNDS",
+                    "STENCIL_COMPARE_MASK",
+                    "STENCIL_WRITE_MASK",
+                    "STENCIL_REFERENCE", /* ... more */
+                ]
+            }
+        },
+        "pipelineLayoutName": {
+            "type": "string",
+            "description": "Name of the VkPipelineLayout to use (must be pre-created)."
+        },
+        "renderPassName": {
+            "type": "string",
+            "description": "Name of a compatible VkRenderPass to use (must be pre-created). Required for graphics pipelines."
+        }
+    },
+    "required": [
+        "name",
+        "type",
+        "shaderStages",
+        "rasterizationState",
+        "pipelineLayoutName"
+        // Add other essential properties
+    ],
+    // Add dependencies, e.g., renderPassName is required if type is GRAPHICS
+    "if": {
+        "properties": {
+            "type": {
+                "const": "GRAPHICS"
+            }
+        }
+    },
+    "then": {
+        "required": [
+            "renderPassName",
+            "vertexInputState",
+            "inputAssemblyState", /* ... other graphics specific states */
+        ]
+    }
+}

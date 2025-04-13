@@ -2,7 +2,7 @@
 #include "Buffer.hh"
 #include "Camera.hh"
 #include "Device.hh"
-#include "Laconic.hh"
+#include "Image.hh"
 #include "Material.hh"
 #include "Model.hh"
 #include "Pipeline.hh"
@@ -57,8 +57,8 @@ struct App
     std::unique_ptr<letc::Points> points;
     std::unique_ptr<letc::PointsRenderer> pointsRenderer;
 
-    std::unique_ptr<letc::ImageBuffer<float>> depthBuffer;
-    vk::UniqueImageView depthImageView;
+    std::unique_ptr<letc::Image> depthImage;
+    std::unique_ptr<letc::ImageView> depthImageView;
 
     double lastMouseX, lastMouseY;
 
@@ -166,22 +166,8 @@ struct App
                                                                 readFile(resourcePath / "points.frag.spv"));
 
         // depth buffer initialization
-        depthBuffer = std::make_unique<letc::ImageBuffer<float>>(
-            allocator->allocator, static_cast<uint32_t>(window->getWidth()), static_cast<uint32_t>(window->getHeight()),
-            vk::Format::eD32Sfloat, std::vector<float>(window->getWidth() * window->getHeight(), 0.0f),
-            vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::ImageTiling::eOptimal);
-
-        depthImageView = device->device.createImageViewUnique(
-            vk::ImageViewCreateInfo{}
-                .setImage(depthBuffer->m_gpuImage)
-                .setViewType(vk::ImageViewType::e2D)
-                .setFormat(vk::Format::eD32Sfloat)
-                .setSubresourceRange(vk::ImageSubresourceRange{}
-                                         .setAspectMask(vk::ImageAspectFlagBits::eDepth)
-                                         .setBaseMipLevel(0)
-                                         .setLevelCount(1)
-                                         .setBaseArrayLayer(0)
-                                         .setLayerCount(1)));
+        depthImage = letc::laconic::depthImage(allocator->allocator, window->getWidth(), window->getHeight());
+        depthImageView = letc::laconic::depthImageView(*device, *depthImage);
 
         std::tie(lastMouseX, lastMouseY) = window->getCursorPos();
         window->callbacks()->on_scroll = [this](vkfw::Window const &, double x, double y) {
@@ -271,43 +257,20 @@ struct App
                                         .setMinDepth(0.0f)
                                         .setMaxDepth(1.0f));
 
-        vk::ImageMemoryBarrier colorBarrier{};
-        colorBarrier.setSrcAccessMask(vk::AccessFlags{});
-        colorBarrier.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
-        colorBarrier.setOldLayout(vk::ImageLayout::eUndefined);
-        colorBarrier.setNewLayout(vk::ImageLayout::eColorAttachmentOptimal);
-        colorBarrier.setSrcQueueFamilyIndex(vk::QueueFamilyIgnored);
-        colorBarrier.setDstQueueFamilyIndex(vk::QueueFamilyIgnored);
-        colorBarrier.setImage(swapchain->images.at(m_currentImageIndex));
-        colorBarrier.setSubresourceRange(vk::ImageSubresourceRange{}
-                                             .setAspectMask(vk::ImageAspectFlagBits::eColor)
-                                             .setBaseMipLevel(0)
-                                             .setLevelCount(1)
-                                             .setBaseArrayLayer(0)
-                                             .setLayerCount(1));
+        // color attachment layout transition
+        letc::laconic::transitionImageLayout(
+            *commandBuffer, swapchain->images.at(m_currentImageIndex), vk::ImageAspectFlagBits::eColor,
+            vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::AccessFlags{},
+            vk::AccessFlagBits::eColorAttachmentWrite, vk::PipelineStageFlagBits::eTopOfPipe,
+            vk::PipelineStageFlagBits::eColorAttachmentOutput
 
-        vk::ImageMemoryBarrier depthBarrier{};
-        depthBarrier.setSrcAccessMask(vk::AccessFlags{});
-        depthBarrier.setDstAccessMask(vk::AccessFlagBits::eDepthStencilAttachmentRead |
-                                      vk::AccessFlagBits::eDepthStencilAttachmentWrite);
-        depthBarrier.setOldLayout(vk::ImageLayout::eUndefined);
-        depthBarrier.setNewLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
-        depthBarrier.setSrcQueueFamilyIndex(vk::QueueFamilyIgnored);
-        depthBarrier.setDstQueueFamilyIndex(vk::QueueFamilyIgnored);
-        depthBarrier.setImage(depthBuffer->m_gpuImage);
-        depthBarrier.setSubresourceRange(vk::ImageSubresourceRange{}
-                                             .setAspectMask(vk::ImageAspectFlagBits::eDepth)
-                                             .setBaseMipLevel(0)
-                                             .setLevelCount(1)
-                                             .setBaseArrayLayer(0)
-                                             .setLayerCount(1));
-
-        commandBuffer->pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-                                       vk::PipelineStageFlagBits::eEarlyFragmentTests, {}, 0, nullptr, 0, nullptr, 1,
-                                       &depthBarrier);
-        commandBuffer->pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-                                       vk::PipelineStageFlagBits::eColorAttachmentOutput, {}, 0, nullptr, 0, nullptr, 1,
-                                       &colorBarrier);
+        );
+        // depth attachment layout transition
+        letc::laconic::transitionImageLayout(
+            *commandBuffer, *depthImage, vk::ImageAspectFlagBits::eDepth, vk::ImageLayout::eUndefined,
+            vk::ImageLayout::eDepthStencilAttachmentOptimal, vk::AccessFlags{},
+            vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+            vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eEarlyFragmentTests);
 
         vk::RenderingInfo renderingInfo{};
         renderingInfo.setRenderArea(vk::Rect2D{}.setOffset({0, 0}).setExtent(
@@ -350,23 +313,12 @@ struct App
         points->draw(*commandBuffer);
 
         commandBuffer->endRendering();
-
-        commandBuffer->pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                                       vk::PipelineStageFlagBits::eBottomOfPipe, {}, 0, nullptr, 0, nullptr, 1,
-                                       &vk::ImageMemoryBarrier{}
-                                            .setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite)
-                                            .setDstAccessMask(vk::AccessFlagBits::eMemoryRead)
-                                            .setOldLayout(vk::ImageLayout::eColorAttachmentOptimal)
-                                            .setNewLayout(vk::ImageLayout::ePresentSrcKHR)
-                                            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-                                            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-                                            .setImage(swapchain->images.at(m_currentImageIndex))
-                                            .setSubresourceRange(vk::ImageSubresourceRange{}
-                                                                     .setAspectMask(vk::ImageAspectFlagBits::eColor)
-                                                                     .setBaseMipLevel(0)
-                                                                     .setLevelCount(1)
-                                                                     .setBaseArrayLayer(0)
-                                                                     .setLayerCount(1)));
+        
+        // color attachment layout transition
+        letc::laconic::transitionImageLayout(*commandBuffer, swapchain->images.at(m_currentImageIndex), 
+                                            vk::ImageAspectFlagBits::eColor, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR,
+                                            vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eMemoryRead, vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                                            vk::PipelineStageFlagBits::eBottomOfPipe);
 
         commandBuffer->end();
 
