@@ -1,6 +1,7 @@
 #include "Allocator.hh"
 #include "Buffer.hh"
 #include "Camera.hh"
+#include "Descriptor.hh"
 #include "Device.hh"
 #include "Image.hh"
 #include "Material.hh"
@@ -56,6 +57,8 @@ struct App
 
     std::unique_ptr<letc::Points> points;
     std::unique_ptr<letc::PointsRenderer> pointsRenderer;
+
+    std::unique_ptr<letc::DescriptorManager> descriptorManager;
 
     std::unique_ptr<letc::Image> depthImage;
     std::unique_ptr<letc::ImageView> depthImageView;
@@ -164,6 +167,17 @@ struct App
         pointsRenderer = std::make_unique<letc::PointsRenderer>(*allocator, *device, *swapchain,
                                                                 readFile(resourcePath / "points.vert.spv"),
                                                                 readFile(resourcePath / "points.frag.spv"));
+
+        descriptorManager = std::make_unique<letc::DescriptorManager>(*device);
+        descriptorManager->addLayoutBinding("modelLayout", 0, vk::DescriptorType::eUniformBuffer,
+                                            vk::ShaderStageFlagBits::eAllGraphics);
+        descriptorManager->addLayoutBinding("modelLayout", 1, vk::DescriptorType::eStorageBuffer,
+                                            vk::ShaderStageFlagBits::eAllGraphics);
+        descriptorManager->addLayoutBinding("modelLayout", 2, vk::DescriptorType::eUniformBuffer,
+                                            vk::ShaderStageFlagBits::eAllGraphics);
+        descriptorManager->createLayout("modelLayout");
+        descriptorManager->createSet("modelLayout", "model1");
+        auto sets = descriptorManager->organizeSets("model1");
 
         // depth buffer initialization
         depthImage = letc::laconic::depthImage(allocator->allocator, window->getWidth(), window->getHeight());
