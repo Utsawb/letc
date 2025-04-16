@@ -72,15 +72,3 @@ inline std::vector<char> readFile(const std::filesystem::path &path)
 
     return buffer;
 }
-
-inline std::vector<std::string> split(std::string str, std::string delim = " ")
-{
-    std::vector<std::string> result;
-    for (std::size_t pos; (pos = str.find(delim)) != std::string::npos;)
-    {
-        result.emplace_back(str.substr(0, pos));
-        str = str.substr(pos + delim.size());
-    }
-    result.emplace_back(str);
-    return result;
-}
