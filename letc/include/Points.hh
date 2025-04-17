@@ -3,12 +3,10 @@
 #include "pch.hh"
 
 #include "Allocator.hh"
-#include "Descriptor.hh"
-#include "Pipeline.hh"
-#include "Swapchain.hh"
-#include "Material.hh"
-#include "Device.hh"
 #include "Buffer.hh"
+#include "Descriptor.hh"
+#include "Device.hh"
+#include "Pipeline.hh"
 
 // i have gotten very hacky, yes this is hacky
 // but i need results and as some guy once said,
@@ -25,18 +23,15 @@ namespace letc
         const Allocator &allocator;
 
         std::unique_ptr<DescriptorLayout> layout;
-        std::unique_ptr<Material> material;
         std::unique_ptr<GraphicsPipeline> pipeline;
 
-        PointsRenderer(const Allocator &allocator, const Device &device, const std::vector<char> &vertexCode, const std::vector<char> &fragmentCode)
+        PointsRenderer(const Allocator &allocator, const Device &device, const std::vector<char> &vertexCode,
+                       const std::vector<char> &fragmentCode)
             : allocator(allocator), device(device)
         {
             layout = std::make_unique<DescriptorLayout>(device);
-            layout->addBinding(0, 0, vk::DescriptorType::eUniformBuffer,
-                               vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 1);
+            layout->addBinding(0, 0, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eAllGraphics, 1);
             layout->generateLayouts();
-
-            material = std::make_unique<Material>(device, allocator, *layout); // add camera later?
 
             letc::GraphicsPipelineBuilder gpb;
             gpb.addShaderStage(vertexCode, vk::ShaderStageFlagBits::eVertex);
@@ -67,8 +62,9 @@ namespace letc
         Points(const letc::Allocator &allocator) : allocator(allocator)
         {
             points.reserve(capacity);
-            buffer = std::make_unique<letc::Buffer>(allocator, capacity * sizeof(glm::vec3), vk::BufferUsageFlagBits::eVertexBuffer,
-                                                    VMA_MEMORY_USAGE_CPU_TO_GPU);
+            buffer =
+                std::make_unique<letc::Buffer>(allocator, capacity * sizeof(glm::vec3),
+                                               vk::BufferUsageFlagBits::eVertexBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
         }
 
         void cpy()
@@ -77,8 +73,9 @@ namespace letc
             {
                 capacity = std::bit_ceil(points.size() * 2);
                 buffer.reset();
-                buffer = std::make_unique<letc::Buffer>(allocator, capacity * sizeof(glm::vec3), vk::BufferUsageFlagBits::eVertexBuffer,
-                                                        VMA_MEMORY_USAGE_CPU_TO_GPU);
+                buffer =
+                    std::make_unique<letc::Buffer>(allocator, capacity * sizeof(glm::vec3),
+                                                   vk::BufferUsageFlagBits::eVertexBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
             }
 
             buffer->cpy(points.data(), points.size() * sizeof(glm::vec3));

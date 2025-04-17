@@ -98,9 +98,6 @@ struct App
     std::unique_ptr<letc::Points> points;
     std::unique_ptr<letc::PointsRenderer> pointsRenderer;
 
-    std::unique_ptr<letc::Image> depthImage;         // Renamed from depthBuffer for consistency
-    std::unique_ptr<letc::ImageView> depthImageView; // Renamed for consistency
-
     std::unique_ptr<letc::Image> xrDepthImage;         // Renamed from xrDepthBuffer for consistency
     std::unique_ptr<letc::ImageView> xrDepthImageView; // Renamed for consistency
 
@@ -199,8 +196,13 @@ struct App
                                             vk::ShaderStageFlagBits::eAllGraphics);
         descriptorManager->createLayout("pbrModelLayout");
 
+        descriptorManager->addLayoutBinding("pointsCameraLayout", 0, vk::DescriptorType::eUniformBuffer,
+                                            vk::ShaderStageFlagBits::eAllGraphics);
+        descriptorManager->createLayout("pointsCameraLayout");
+
         descriptorManager->createSet("pbrGlobalLayout", "pbrGlobalSet");
         descriptorManager->createSet("pbrModelLayout", "pbrModelSet");
+        descriptorManager->createSet("pointsCameraLayout", "pointsCameraSet");
 
         xr::GraphicsBindingVulkanKHR xrGraphicsBinding{};
         xrGraphicsBinding.next = nullptr;
@@ -470,24 +472,10 @@ struct App
         modelRenderer = std::make_unique<letc::ModelRenderer>(
             *allocator, *device, readFile(resourcePath / "pbr.vert.spv"), readFile(resourcePath / "pbr.frag.spv"));
 
-        // *** Update ModelRenderer's descriptor sets ***
-        modelRenderer->material->updateDescriptorBufferInfo(0, 0, globalUniformsBuffer->buffer, 0,
-                                                            sizeof(GlobalUniforms));
-        modelRenderer->material->updateDescriptorBufferInfo(0, 1, lightsBuffer->buffer, 0,
-                                                            sizeof(Light) * lights.size());
-        // Binding for the SSBO
-        modelRenderer->material->updateDescriptorBufferInfo(1, 0, modelUniformsBuffer->buffer, 0,
-                                                            sizeof(letc::Model::UniformBuffer) * modelUniforms.size());
-        modelRenderer->material->updateDescriptorSets(); // Update all sets once
-
         points = std::make_unique<letc::Points>(*allocator);
         pointsRenderer =
             std::make_unique<letc::PointsRenderer>(*allocator, *device, readFile(resourcePath / "points.vert.spv"),
                                                    readFile(resourcePath / "points.frag.spv"));
-
-        // depth buffer initialization (flat)
-        depthImage = letc::laconic::depthImage(allocator->allocator, window->getWidth(), window->getHeight());
-        depthImageView = letc::laconic::depthImageView(*device, *depthImage);
 
         xrDepthImage =
             letc::laconic::depthImage(allocator->allocator, xrViewConfigurationViews.at(0).recommendedImageRectWidth,
@@ -712,10 +700,6 @@ struct App
         descriptorManager->attachBuffer("pbrGlobalSet", 1, lightsBuffer->buffer, sizeof(Light) * lights.size());
         descriptorManager->attachBuffer("pbrModelSet", 0, modelUniformsBuffer->buffer,
                                         sizeof(letc::Model::UniformBuffer) * models.size());
-
-        // *** No need to update modelRenderer descriptor sets here unless ***
-        // *** global/light/model SSBO buffer bindings change, which they don't per frame ***
-        modelRenderer->material->updateDescriptorSets(); // Remove this
         points->cpy();
     }
 
@@ -797,18 +781,10 @@ struct App
             uint32_t eyeWidth = xrViewConfigurationViews.at(eye).recommendedImageRectWidth;
             uint32_t eyeHeight = xrViewConfigurationViews.at(eye).recommendedImageRectHeight;
 
-            // *** Update ModelRenderer camera binding for the current eye ***
-            modelRenderer->material->updateDescriptorBufferInfo(0, 2, *xrCameras[eye]->buffer, 0,
-                                                                sizeof(letc::Camera::Uniform));
-            modelRenderer->material->updateDescriptorSet(0); // Only update set 0 (camera)
-
             descriptorManager->attachBuffer("pbrGlobalSet", 2, xrCameras[eye]->buffer->buffer,
                                             sizeof(letc::Camera::Uniform));
-
-            // Update PointsRenderer camera binding
-            pointsRenderer->material->updateDescriptorBufferInfo(0, 0, *xrCameras[eye]->buffer, 0,
-                                                                 sizeof(letc::Camera::Uniform));
-            pointsRenderer->material->updateDescriptorSet(0);
+            descriptorManager->attachBuffer("pointsCameraSet", 0, xrCameras[eye]->buffer->buffer,
+                                            sizeof(letc::Camera::Uniform));
 
             vk::UniqueCommandBuffer &commandBuffer = commandBuffers.at(2);
             commandBuffer->reset(vk::CommandBufferResetFlagBits::eReleaseResources);
@@ -860,7 +836,6 @@ struct App
 
             // *** Render models using ModelRenderer and push constants ***
             modelRenderer->pipeline->bind(commandBuffer.get());
-            // modelRenderer->material->bind(commandBuffer.get(), *modelRenderer->pipeline);
 
             auto sets = descriptorManager->organizeSets("pbrGlobalSet", "pbrModelSet");
             commandBuffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, modelRenderer->pipeline->layout, 0,
@@ -874,9 +849,10 @@ struct App
             }
 
             pointsRenderer->pipeline->bind(commandBuffer.get());
-            pointsRenderer->material->bind(commandBuffer.get(), *pointsRenderer->pipeline);
+            sets = descriptorManager->organizeSets("pointsCameraSet");
+            commandBuffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pointsRenderer->pipeline->layout, 0,
+                                              sets.size(), sets.data(), 0, nullptr);
             points->draw(*commandBuffer);
-
             commandBuffer->endRendering();
 
             // color attachment layout transition

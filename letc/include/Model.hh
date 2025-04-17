@@ -11,10 +11,8 @@
 #include "Buffer.hh"
 #include "Descriptor.hh"
 #include "Device.hh"
-#include "Material.hh"
 #include "Pipeline.hh"
 #include "Renderable.hh"
-#include "Swapchain.hh"
 
 namespace letc
 {
@@ -24,7 +22,6 @@ namespace letc
         const Allocator &allocator;
 
         std::unique_ptr<DescriptorLayout> layout;
-        std::unique_ptr<Material> material;
         std::unique_ptr<GraphicsPipeline> pipeline;
 
         ModelRenderer(const Allocator &allocator, const Device &device, const std::vector<char> &vertexCode,
@@ -37,8 +34,6 @@ namespace letc
             layout->addBinding(0, 2, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eAllGraphics, 1);
             layout->addBinding(1, 0, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eAllGraphics, 1);
             layout->generateLayouts();
-
-            material = std::make_unique<Material>(device, allocator, *layout);
 
             letc::GraphicsPipelineBuilder gpb;
             gpb.addShaderStage(vertexCode, vk::ShaderStageFlagBits::eVertex);
