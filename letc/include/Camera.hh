@@ -1,6 +1,7 @@
 #pragma once
+
 #include <memory>
-#include <vulkan/vulkan_enums.hpp>
+
 #ifndef LETC_CAMERA_HH
 #define LETC_CAMERA_HH
 
