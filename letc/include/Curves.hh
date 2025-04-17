@@ -38,7 +38,7 @@ namespace letc
             gpb.rasterizationInfo.setCullMode(vk::CullModeFlagBits::eNone);
             pipeline = std::make_unique<GraphicsPipeline>(device, gpb);
 
-            material = std::make_unique<Material>(device, allocator, *pipeline);
+            material = std::make_unique<Material>(device.device, allocator.allocator, pipeline);
         }
     };
 

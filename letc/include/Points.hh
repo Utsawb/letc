@@ -28,7 +28,7 @@ namespace letc
         std::unique_ptr<Material> material;
         std::unique_ptr<GraphicsPipeline> pipeline;
 
-        PointsRenderer(const Allocator &allocator, const Device &device, const Swapchain &swapchain, const std::vector<char> &vertexCode, const std::vector<char> &fragmentCode)
+        PointsRenderer(const Allocator &allocator, const Device &device, const std::vector<char> &vertexCode, const std::vector<char> &fragmentCode)
             : allocator(allocator), device(device)
         {
             layout = std::make_unique<DescriptorLayout>(device);
@@ -46,8 +46,9 @@ namespace letc
             gpb.setLayout(layout.get());
             gpb.inputAssemblyInfo.setTopology(vk::PrimitiveTopology::ePointList);
             gpb.rasterizationInfo.setPolygonMode(vk::PolygonMode::ePoint);
+            auto fmt = vk::Format::eR8G8B8A8Srgb;
             gpb.renderingInfo.setColorAttachmentCount(1);
-            gpb.renderingInfo.setPColorAttachmentFormats(&swapchain.format.format);
+            gpb.renderingInfo.setColorAttachmentFormats(fmt);
             gpb.rasterizationInfo.setCullMode(vk::CullModeFlagBits::eNone);
             pipeline = std::make_unique<GraphicsPipeline>(device, gpb);
         }

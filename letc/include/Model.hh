@@ -27,17 +27,15 @@ namespace letc
         std::unique_ptr<Material> material;
         std::unique_ptr<GraphicsPipeline> pipeline;
 
-        ModelRenderer(const Allocator &allocator, const Device &device, const Swapchain &swapchain,
-                      const std::vector<char> &vertexCode, const std::vector<char> &fragmentCode)
+        ModelRenderer(const Allocator &allocator, const Device &device, const std::vector<char> &vertexCode,
+                      const std::vector<char> &fragmentCode)
             : allocator(allocator), device(device)
         {
             layout = std::make_unique<DescriptorLayout>(device);
-            layout->addBinding(0, 0, vk::DescriptorType::eUniformBuffer,
-                               vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 1);
-            layout->addBinding(0, 1, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eFragment, 1);
-            layout->addBinding(0, 2, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex, 1);
-            layout->addBinding(1, 0, vk::DescriptorType::eStorageBuffer,
-                               vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 1);
+            layout->addBinding(0, 0, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eAllGraphics, 1);
+            layout->addBinding(0, 1, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eAllGraphics, 1);
+            layout->addBinding(0, 2, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eAllGraphics, 1);
+            layout->addBinding(1, 0, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eAllGraphics, 1);
             layout->generateLayouts();
 
             material = std::make_unique<Material>(device, allocator, *layout);
@@ -58,8 +56,8 @@ namespace letc
                                          .setOffset(0)
                                          .setStageFlags(vk::ShaderStageFlagBits::eAllGraphics));
             gpb.setLayout(layout.get());
-            gpb.renderingInfo.setColorAttachmentCount(1);
-            gpb.renderingInfo.setPColorAttachmentFormats(&swapchain.format.format);
+            auto fmt = vk::Format::eR8G8B8A8Srgb;
+            gpb.renderingInfo.setColorAttachmentFormats(fmt);
             gpb.setRasterization(gpb.rasterizationInfo.setCullMode(vk::CullModeFlagBits::eNone));
 
             pipeline = std::make_unique<GraphicsPipeline>(device, gpb);
@@ -238,7 +236,8 @@ namespace letc
         Models(const Allocator &allocator, const std::size_t &size)
         {
             uniforms = std::make_unique<BufferVector<Model::UniformBuffer>>(
-                allocator, size * sizeof(Model::UniformBuffer), vk::BufferUsageFlagBits::eStorageBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
+                allocator, size * sizeof(Model::UniformBuffer), vk::BufferUsageFlagBits::eStorageBuffer,
+                VMA_MEMORY_USAGE_CPU_TO_GPU);
         }
 
         void addModel(std::unique_ptr<Model> model)

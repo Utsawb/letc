@@ -49,8 +49,9 @@ struct App
 
     std::unique_ptr<letc::Device> device;
     std::unique_ptr<letc::Allocator> allocator;
-    std::unique_ptr<letc::Swapchain> swapchain;
     vk::Queue queue;
+
+    std::unique_ptr<letc::DescriptorManager> descriptorManager;
 
     xr::UniqueDynamicSession xrSession;
     xr::UniqueDynamicSwapchain xrSwapchain[2];
@@ -86,7 +87,6 @@ struct App
     std::vector<Light> lights;
     std::unique_ptr<letc::Buffer> lightsBuffer;
 
-    std::unique_ptr<letc::Camera> camera;
     std::vector<std::unique_ptr<letc::Camera>> xrCameras;
 
     std::vector<letc::Model> models;
@@ -184,8 +184,23 @@ struct App
         allocator = std::make_unique<letc::Allocator>(*instance, *device);
 
         // swapchain + queue initialization
-        swapchain = std::make_unique<letc::Swapchain>(*window, *surface, *device);
         queue = device->queues["graphics"].queue;
+
+        descriptorManager = std::make_unique<letc::DescriptorManager>(*device);
+        descriptorManager->addLayoutBinding("pbrGlobalLayout", 0, vk::DescriptorType::eUniformBuffer,
+                                            vk::ShaderStageFlagBits::eAllGraphics);
+        descriptorManager->addLayoutBinding("pbrGlobalLayout", 1, vk::DescriptorType::eStorageBuffer,
+                                            vk::ShaderStageFlagBits::eAllGraphics);
+        descriptorManager->addLayoutBinding("pbrGlobalLayout", 2, vk::DescriptorType::eUniformBuffer,
+                                            vk::ShaderStageFlagBits::eAllGraphics);
+        descriptorManager->createLayout("pbrGlobalLayout");
+
+        descriptorManager->addLayoutBinding("pbrModelLayout", 0, vk::DescriptorType::eStorageBuffer,
+                                            vk::ShaderStageFlagBits::eAllGraphics);
+        descriptorManager->createLayout("pbrModelLayout");
+
+        descriptorManager->createSet("pbrGlobalLayout", "pbrGlobalSet");
+        descriptorManager->createSet("pbrModelLayout", "pbrModelSet");
 
         xr::GraphicsBindingVulkanKHR xrGraphicsBinding{};
         xrGraphicsBinding.next = nullptr;
@@ -321,7 +336,7 @@ struct App
 
         auto xrSwapchainFormat = xrSession->enumerateSwapchainFormatsToVector(xrDispatchLoader);
         auto it = std::find_if(xrSwapchainFormat.begin(), xrSwapchainFormat.end(),
-                               [this](int64_t &f) { return f == (long long)swapchain->format.format; });
+                               [this](int64_t &f) { return f == (long long)vk::Format::eR8G8B8A8Srgb; });
         assertThrow(it != xrSwapchainFormat.end(), "failed to find swapchain format");
         this->xrSwapchainFormat = *it;
         // std::cout << std::format("Prefered format: {}\n", *it);
@@ -331,7 +346,7 @@ struct App
         xrSwapchainInfo.createFlags = xr::SwapchainCreateFlagBits::None;
         xrSwapchainInfo.usageFlags = xr::SwapchainUsageFlagBits::ColorAttachment |
                                      xr::SwapchainUsageFlagBits::TransferSrc | xr::SwapchainUsageFlagBits::TransferDst;
-        xrSwapchainInfo.format = (long long)swapchain->format.format;
+        xrSwapchainInfo.format = (long)vk::Format::eR8G8B8A8Srgb;
         xrSwapchainInfo.sampleCount = 1;
         xrSwapchainInfo.width = xrViewConfigurationViews.at(0).recommendedImageRectWidth;
         xrSwapchainInfo.height = xrViewConfigurationViews.at(0).recommendedImageRectHeight;
@@ -362,7 +377,7 @@ struct App
             swapchainImageViews[0][i] =
                 device->device.createImageViewUnique(vk::ImageViewCreateInfo{}
                                                          .setImage(xrSwapchainImageVk[0][i].image)
-                                                         .setFormat(swapchain->format.format)
+                                                         .setFormat(vk::Format::eR8G8B8A8Srgb)
                                                          .setViewType(vk::ImageViewType::e2D)
                                                          .setComponents(vk::ComponentMapping{})
                                                          .setSubresourceRange(imageSubresourceRange));
@@ -380,7 +395,7 @@ struct App
             swapchainImageViews[1][i] =
                 device->device.createImageViewUnique(vk::ImageViewCreateInfo{}
                                                          .setImage(xrSwapchainImageVk[1][i].image)
-                                                         .setFormat(swapchain->format.format)
+                                                         .setFormat(vk::Format::eR8G8B8A8Srgb)
                                                          .setViewType(vk::ImageViewType::e2D)
                                                          .setComponents(vk::ComponentMapping{})
                                                          .setSubresourceRange(imageSubresourceRange));
@@ -419,11 +434,6 @@ struct App
             std::make_unique<letc::Buffer>(*allocator, sizeof(Light) * lights.size(),
                                            vk::BufferUsageFlagBits::eStorageBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-        // Flat camera
-        camera = std::make_unique<letc::Camera>(*allocator, glm::vec4{0.0f, 0.0f, 2.0f, 1.0f},
-                                                glm::vec4{0.0f, 0.0f, 0.0f, 1.0f}, glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
-                                                60.0f, (float)window->getWidth() / (float)window->getHeight());
-
         // XR cameras
         for (int i = 0; i < 2; ++i)
         {
@@ -457,26 +467,23 @@ struct App
                                            vk::BufferUsageFlagBits::eStorageBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
         // *** Initialize ModelRenderer ***
-        modelRenderer = std::make_unique<letc::ModelRenderer>(*allocator, *device, *swapchain,
-                                                              readFile(resourcePath / "pbr.vert.spv"),
-                                                              readFile(resourcePath / "pbr.frag.spv"));
+        modelRenderer = std::make_unique<letc::ModelRenderer>(
+            *allocator, *device, readFile(resourcePath / "pbr.vert.spv"), readFile(resourcePath / "pbr.frag.spv"));
 
         // *** Update ModelRenderer's descriptor sets ***
         modelRenderer->material->updateDescriptorBufferInfo(0, 0, globalUniformsBuffer->buffer, 0,
                                                             sizeof(GlobalUniforms));
         modelRenderer->material->updateDescriptorBufferInfo(0, 1, lightsBuffer->buffer, 0,
                                                             sizeof(Light) * lights.size());
-        // Initial camera binding (will be updated per frame)
-        modelRenderer->material->updateDescriptorBufferInfo(0, 2, *camera->buffer, 0, sizeof(letc::Camera::Uniform));
         // Binding for the SSBO
         modelRenderer->material->updateDescriptorBufferInfo(1, 0, modelUniformsBuffer->buffer, 0,
                                                             sizeof(letc::Model::UniformBuffer) * modelUniforms.size());
         modelRenderer->material->updateDescriptorSets(); // Update all sets once
 
         points = std::make_unique<letc::Points>(*allocator);
-        pointsRenderer = std::make_unique<letc::PointsRenderer>(*allocator, *device, *swapchain,
-                                                                readFile(resourcePath / "points.vert.spv"),
-                                                                readFile(resourcePath / "points.frag.spv"));
+        pointsRenderer =
+            std::make_unique<letc::PointsRenderer>(*allocator, *device, readFile(resourcePath / "points.vert.spv"),
+                                                   readFile(resourcePath / "points.frag.spv"));
 
         // depth buffer initialization (flat)
         depthImage = letc::laconic::depthImage(allocator->allocator, window->getWidth(), window->getHeight());
@@ -488,9 +495,6 @@ struct App
         xrDepthImageView = letc::laconic::depthImageView(*device, *xrDepthImage);
 
         std::tie(lastMouseX, lastMouseY) = window->getCursorPos();
-        window->callbacks()->on_scroll = [this](vkfw::Window const &, double x, double y) {
-            camera->zoom(static_cast<float>(y));
-        };
 
         // Poll for events until the session is ready
         while (true)
@@ -571,19 +575,6 @@ struct App
         {
             window->setShouldClose(true);
         }
-
-        auto [mouseX, mouseY] = window->getCursorPos();
-        if (window->getMouseButton(vkfw::MouseButton::eLeft))
-        {
-            float orbitSensitivity = 0.05f;
-            float deltaX = static_cast<float>(mouseX - lastMouseX);
-            float deltaY = static_cast<float>(mouseY - lastMouseY);
-
-            camera->orbit(deltaX * orbitSensitivity, deltaY * orbitSensitivity);
-        }
-        lastMouseX = mouseX;
-        lastMouseY = mouseY;
-        camera->updateView();
 
         globalUniforms.time = static_cast<float>(vkfw::getTime());
         globalUniforms.frame = static_cast<float>(currentFrame++);
@@ -715,8 +706,12 @@ struct App
     {
         globalUniformsBuffer->cpy(&globalUniforms, sizeof(GlobalUniforms));
         lightsBuffer->cpy(lights.data(), sizeof(Light) * lights.size());
-        camera->cpy(); // Flat camera
         modelUniformsBuffer->cpy(modelUniforms.data(), sizeof(letc::Model::UniformBuffer) * models.size());
+
+        descriptorManager->attachBuffer("pbrGlobalSet", 0, globalUniformsBuffer->buffer, sizeof(GlobalUniforms));
+        descriptorManager->attachBuffer("pbrGlobalSet", 1, lightsBuffer->buffer, sizeof(Light) * lights.size());
+        descriptorManager->attachBuffer("pbrModelSet", 0, modelUniformsBuffer->buffer,
+                                        sizeof(letc::Model::UniformBuffer) * models.size());
 
         // *** No need to update modelRenderer descriptor sets here unless ***
         // *** global/light/model SSBO buffer bindings change, which they don't per frame ***
@@ -807,6 +802,9 @@ struct App
                                                                 sizeof(letc::Camera::Uniform));
             modelRenderer->material->updateDescriptorSet(0); // Only update set 0 (camera)
 
+            descriptorManager->attachBuffer("pbrGlobalSet", 2, xrCameras[eye]->buffer->buffer,
+                                            sizeof(letc::Camera::Uniform));
+
             // Update PointsRenderer camera binding
             pointsRenderer->material->updateDescriptorBufferInfo(0, 0, *xrCameras[eye]->buffer, 0,
                                                                  sizeof(letc::Camera::Uniform));
@@ -862,8 +860,13 @@ struct App
 
             // *** Render models using ModelRenderer and push constants ***
             modelRenderer->pipeline->bind(commandBuffer.get());
-            modelRenderer->material->bind(commandBuffer.get(), *modelRenderer->pipeline); // Bind all descriptor sets
-            for (uint32_t i = 0; i < models.size(); ++i)                                  // Render all models
+            // modelRenderer->material->bind(commandBuffer.get(), *modelRenderer->pipeline);
+
+            auto sets = descriptorManager->organizeSets("pbrGlobalSet", "pbrModelSet");
+            commandBuffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, modelRenderer->pipeline->layout, 0,
+                                              sets.size(), sets.data(), 0, nullptr);
+
+            for (uint32_t i = 0; i < models.size(); ++i)
             {
                 commandBuffer->pushConstants(modelRenderer->pipeline->layout, vk::ShaderStageFlagBits::eAllGraphics, 0,
                                              sizeof(uint32_t), &i);
@@ -920,127 +923,6 @@ struct App
         xrSession->endFrame(xrFrameEndInfo, xrDispatchLoader);
     }
 
-    void flatFrame()
-    {
-        auto [result, imageIndex] =
-            device->device.acquireNextImageKHR(*swapchain, 5000000000, nullptr, imageFence.get());
-        assertThrow(result == vk::Result::eSuccess, "failed to acquire next image: " + vk::to_string(result));
-        m_currentImageIndex = imageIndex;
-
-        // *** Update ModelRenderer camera binding for the flat view ***
-        modelRenderer->material->updateDescriptorBufferInfo(0, 2, *camera->buffer, 0, sizeof(letc::Camera::Uniform));
-        modelRenderer->material->updateDescriptorSet(0); // Only update set 0 (camera)
-
-        pointsRenderer->material->updateDescriptorBufferInfo(0, 0, *camera->buffer, 0, sizeof(letc::Camera::Uniform));
-        pointsRenderer->material->updateDescriptorSet(0);
-
-        vk::UniqueCommandBuffer &commandBuffer = commandBuffers.at(2);
-        commandBuffer->reset(vk::CommandBufferResetFlagBits::eReleaseResources);
-        commandBuffer->begin(vk::CommandBufferBeginInfo{}.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-        commandBuffer->setScissor(
-            0, 1,
-            &vk::Rect2D{}.setOffset({0, 0}).setExtent(
-                {static_cast<uint32_t>(window->getWidth()), static_cast<uint32_t>(window->getHeight())}));
-        commandBuffer->setViewport(0, 1,
-                                   &vk::Viewport{}
-                                        .setX(0.0f)
-                                        .setY(0.0f)
-                                        .setWidth(static_cast<float>(window->getWidth()))
-                                        .setHeight(static_cast<float>(window->getHeight()))
-                                        .setMinDepth(0.0f)
-                                        .setMaxDepth(1.0f));
-
-        // color attachment layout transition
-        letc::laconic::transitionImageLayout(
-            *commandBuffer, swapchain->images.at(m_currentImageIndex), vk::ImageAspectFlagBits::eColor,
-            vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, vk::AccessFlags{},
-            vk::AccessFlagBits::eColorAttachmentWrite, vk::PipelineStageFlagBits::eTopOfPipe,
-            vk::PipelineStageFlagBits::eColorAttachmentOutput);
-        // depth attachment layout transition
-        letc::laconic::transitionImageLayout(
-            *commandBuffer, *depthImage, vk::ImageAspectFlagBits::eDepth, vk::ImageLayout::eUndefined, // Use depthImage
-            vk::ImageLayout::eDepthStencilAttachmentOptimal, vk::AccessFlags{},
-            vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-            vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eEarlyFragmentTests);
-
-        vk::RenderingInfo renderingInfo{};
-        renderingInfo.setRenderArea(vk::Rect2D{}.setOffset({0, 0}).setExtent(
-            {static_cast<uint32_t>(window->getWidth()), static_cast<uint32_t>(window->getHeight())}));
-        renderingInfo.setLayerCount(1);
-
-        vk::RenderingAttachmentInfo colorAttachment{};
-        colorAttachment.setImageView(swapchain->imageViews.at(m_currentImageIndex));
-        colorAttachment.setImageLayout(vk::ImageLayout::eColorAttachmentOptimal);
-        colorAttachment.setLoadOp(vk::AttachmentLoadOp::eClear);
-        colorAttachment.setStoreOp(vk::AttachmentStoreOp::eStore);
-        colorAttachment.setClearValue(
-            vk::ClearValue{}.setColor(vk::ClearColorValue{}.setFloat32({0.1176f, 0.1176f, 0.1804f, 1.0f})));
-
-        vk::RenderingAttachmentInfo depthAttachment{};
-        depthAttachment.setImageView(*depthImageView);
-        depthAttachment.setImageLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
-        depthAttachment.setLoadOp(vk::AttachmentLoadOp::eClear);
-        depthAttachment.setStoreOp(vk::AttachmentStoreOp::eDontCare);
-        depthAttachment.setClearValue(vk::ClearDepthStencilValue{1.0f, 0});
-
-        renderingInfo.setColorAttachmentCount(1);
-        renderingInfo.setPColorAttachments(&colorAttachment);
-        renderingInfo.setPDepthAttachment(&depthAttachment);
-
-        commandBuffer->beginRendering(renderingInfo);
-
-        // *** Render models using ModelRenderer and push constants ***
-        modelRenderer->pipeline->bind(commandBuffer.get());
-        modelRenderer->material->bind(commandBuffer.get(), *modelRenderer->pipeline);
-
-        for (uint32_t i = 0; i < models.size(); ++i) // Render all models
-        {
-            // Push the model index
-            commandBuffer->pushConstants(modelRenderer->pipeline->layout, vk::ShaderStageFlagBits::eAllGraphics, 0,
-                                         sizeof(uint32_t), &i);
-            models[i].draw(*commandBuffer);
-        }
-
-        pointsRenderer->pipeline->bind(commandBuffer.get());
-        pointsRenderer->material->bind(commandBuffer.get(), *pointsRenderer->pipeline);
-        points->draw(*commandBuffer);
-
-        commandBuffer->endRendering();
-
-        // color attachment layout transition
-        letc::laconic::transitionImageLayout(
-            *commandBuffer, swapchain->images.at(m_currentImageIndex), vk::ImageAspectFlagBits::eColor,
-            vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR,
-            vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eMemoryRead,
-            vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eBottomOfPipe);
-
-        commandBuffer->end();
-
-        vk::Fence &commandFence = commandFences.at(2).get();
-        assertThrow(device->device.resetFences(1, &commandFence) == vk::Result::eSuccess,
-                    "failed to reset command fence");
-
-        queue.submit(vk::SubmitInfo{}.setCommandBufferCount(1).setPCommandBuffers(&commandBuffer.get()), commandFence);
-
-        assertThrow(device->device.waitForFences(1, &commandFence, VK_TRUE, 5000000000) == vk::Result::eSuccess,
-                    "failed to wait for command fence");
-
-        assertThrow(device->device.waitForFences(1, &imageFence.get(), VK_TRUE, 5000000000) == vk::Result::eSuccess,
-                    "failed to wait for image fence");
-
-        assertThrow(queue.presentKHR(vk::PresentInfoKHR{}
-                                         .setWaitSemaphoreCount(0)
-                                         .setPWaitSemaphores(nullptr)
-                                         .setSwapchainCount(1)
-                                         .setPSwapchains(&swapchain->swapchain)
-                                         .setPImageIndices(&m_currentImageIndex)
-                                         .setPNext(nullptr)) == vk::Result::eSuccess,
-                    "failed to present image");
-
-        assertThrow(device->device.resetFences(1, &imageFence.get()) == vk::Result::eSuccess,
-                    "failed to reset image fence");
-    }
-
     ~App()
     {
         device->device.waitIdle();
@@ -1060,7 +942,6 @@ int main(int argc, char *argv[])
         app.updateLogic();
         app.syncData();
         app.xrFrame();
-        app.flatFrame();
     }
     return 0;
 }
