@@ -84,29 +84,71 @@
             "stage": "vertex",
             "parameters": [
                 {
-                    "name": "position",
+                    "name": "a2v",
                     "stage": "vertex",
-                    "binding": {"kind": "varyingInput", "index": 0},
-                    "semanticName": "POSITION",
+                    "binding": {"kind": "varyingInput", "index": 0, "count": 4},
                     "type": {
-                        "kind": "vector",
-                        "elementCount": 3,
-                        "elementType": {
-                            "kind": "scalar",
-                            "scalarType": "float32"
-                        }
+                        "kind": "struct",
+                        "name": "A2V",
+                        "fields": [
+                            {
+                                "name": "trans",
+                                "type": {
+                                    "kind": "matrix",
+                                    "rowCount": 4,
+                                    "columnCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "stage": "vertex",
+                                "binding": {"kind": "varyingInput", "index": 0, "count": 4}
+                            },
+                            {
+                                "name": "vertexID",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "int32"
+                                },
+                                "semanticName": "SV_VERTEXID"
+                            }
+                        ]
                     }
                 }
             ],
             "result": {
                 "semanticName": "SV_POSITION",
                 "type": {
-                    "kind": "vector",
-                    "elementCount": 4,
-                    "elementType": {
-                        "kind": "scalar",
-                        "scalarType": "float32"
-                    }
+                    "kind": "struct",
+                    "name": "V2F",
+                    "fields": [
+                        {
+                            "name": "position",
+                            "type": {
+                                "kind": "vector",
+                                "elementCount": 4,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                }
+                            },
+                            "semanticName": "SV_POSITION"
+                        },
+                        {
+                            "name": "color",
+                            "type": {
+                                "kind": "vector",
+                                "elementCount": 3,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                }
+                            },
+                            "semanticName": "SV_POSITION",
+                            "semanticIndex": 1
+                        }
+                    ]
                 }
             },
             "bindings": [
@@ -119,6 +161,44 @@
         {
             "name": "fs",
             "stage": "fragment",
+            "parameters": [
+                {
+                    "name": "v2f",
+                    "stage": "fragment",
+                    "binding": {"kind": "varyingInput", "index": 0},
+                    "type": {
+                        "kind": "struct",
+                        "name": "V2F",
+                        "fields": [
+                            {
+                                "name": "position",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "semanticName": "SV_POSITION"
+                            },
+                            {
+                                "name": "color",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 3,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "stage": "fragment",
+                                "binding": {"kind": "varyingInput", "index": 0}
+                            }
+                        ]
+                    }
+                }
+            ],
             "result": {
                 "stage": "fragment",
                 "binding": {"kind": "varyingOutput", "index": 0},

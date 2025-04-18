@@ -4,6 +4,7 @@
 #include "Curves.hh"
 #include "Descriptor.hh"
 #include "Device.hh"
+#include "FrenetFrames.hh"
 #include "Image.hh"
 #include "Material.hh"
 #include "Model.hh"
@@ -75,6 +76,9 @@ struct App
 
     std::unique_ptr<letc::CurvesRenderer> curvesRenderer;
     std::unique_ptr<letc::Curves> curves;
+
+    std::unique_ptr<letc::FrenetFramesRenderer> frenetRenderer;
+    std::unique_ptr<letc::FrenetFrame> frenetFrames;
 
     XrContext xrCtx;
 
@@ -206,6 +210,10 @@ struct App
         curvesRenderer =
             std::make_unique<letc::CurvesRenderer>(*allocator, *device, readFile(resourcePath / "curves/curves.spirv"),
                                                    readFile(resourcePath / "curves/curves.spirv"));
+
+        frenetFrames = std::make_unique<letc::FrenetFrame>(*allocator);
+        frenetRenderer = std::make_unique<letc::FrenetFramesRenderer>(*allocator, *device,
+                                                                      readFile(resourcePath / "curves/curves.spirv"));
 
         std::tie(lastMouseX, lastMouseY) = window->getCursorPos();
 

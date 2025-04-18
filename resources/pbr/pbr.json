@@ -630,70 +630,59 @@
                 "binding": {"kind": "varyingOutput", "index": 0, "count": 4},
                 "type": {
                     "kind": "struct",
-                    "name": "TrueOut",
+                    "name": "V2F",
                     "fields": [
                         {
-                            "name": "vOut",
+                            "name": "vPosition",
                             "type": {
-                                "kind": "struct",
-                                "name": "V2F",
-                                "fields": [
-                                    {
-                                        "name": "vPosition",
-                                        "type": {
-                                            "kind": "vector",
-                                            "elementCount": 4,
-                                            "elementType": {
-                                                "kind": "scalar",
-                                                "scalarType": "float32"
-                                            }
-                                        },
-                                        "stage": "vertex",
-                                        "binding": {"kind": "varyingOutput", "index": 0}
-                                    },
-                                    {
-                                        "name": "vNormal",
-                                        "type": {
-                                            "kind": "vector",
-                                            "elementCount": 4,
-                                            "elementType": {
-                                                "kind": "scalar",
-                                                "scalarType": "float32"
-                                            }
-                                        },
-                                        "stage": "vertex",
-                                        "binding": {"kind": "varyingOutput", "index": 1}
-                                    },
-                                    {
-                                        "name": "vTangent",
-                                        "type": {
-                                            "kind": "vector",
-                                            "elementCount": 4,
-                                            "elementType": {
-                                                "kind": "scalar",
-                                                "scalarType": "float32"
-                                            }
-                                        },
-                                        "stage": "vertex",
-                                        "binding": {"kind": "varyingOutput", "index": 2}
-                                    },
-                                    {
-                                        "name": "vTexCoord",
-                                        "type": {
-                                            "kind": "vector",
-                                            "elementCount": 2,
-                                            "elementType": {
-                                                "kind": "scalar",
-                                                "scalarType": "float32"
-                                            }
-                                        },
-                                        "stage": "vertex",
-                                        "binding": {"kind": "varyingOutput", "index": 3}
-                                    }
-                                ]
+                                "kind": "vector",
+                                "elementCount": 4,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                }
                             },
                             "stage": "vertex",
-                            "binding": {"kind": "varyingOutput", "index": 0, "count": 4}
+                            "binding": {"kind": "varyingOutput", "index": 0}
+                        },
+                        {
+                            "name": "vNormal",
+                            "type": {
+                                "kind": "vector",
+                                "elementCount": 4,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                }
+                            },
+                            "stage": "vertex",
+                            "binding": {"kind": "varyingOutput", "index": 1}
+                        },
+                        {
+                            "name": "vTangent",
+                            "type": {
+                                "kind": "vector",
+                                "elementCount": 4,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                }
+                            },
+                            "stage": "vertex",
+                            "binding": {"kind": "varyingOutput", "index": 2}
+                        },
+                        {
+                            "name": "vTexCoord",
+                            "type": {
+                                "kind": "vector",
+                                "elementCount": 2,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                }
+                            },
+                            "stage": "vertex",
+                            "binding": {"kind": "varyingOutput", "index": 3}
                         },
                         {
                             "name": "cPosition",
@@ -788,6 +777,18 @@
                                 },
                                 "stage": "fragment",
                                 "binding": {"kind": "varyingInput", "index": 3}
+                            },
+                            {
+                                "name": "cPosition",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "semanticName": "SV_POSITION"
                             }
                         ]
                     }
