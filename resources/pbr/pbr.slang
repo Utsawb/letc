@@ -1,24 +1,24 @@
 // pbr.slang
 
-struct GlobalUniforms
+struct S_Global
 {
     float time;
     float frame;
 };
 
-struct Light
+struct S_Light
 {
     float4 position;
     float4 color;
 };
 
-struct CameraUniforms
+struct S_Camera
 {
     float4x4 view;
     float4x4 proj;
 };
 
-struct ModelUniform
+struct S_Model
 {
     float4x4 model;
     float4x4 modelInvTranspose;
@@ -26,62 +26,76 @@ struct ModelUniform
     float4 attributeFlags2;
 };
 
-struct FrameFreq
+struct Frame
 {
-    ConstantBuffer<GlobalUniforms> uGlobal;
-    StructuredBuffer<Light> lights;
-    ConstantBuffer<CameraUniforms> uCamera;
-}
-ParameterBlock<FrameFreq> frameFreq;
+    ConstantBuffer<S_Global> globals;
+    StructuredBuffer<S_Light> lights;
+};
+ParameterBlock<Frame> frame;
 
-struct DrawFreq
+struct Draw
 {
-    StructuredBuffer<ModelUniform> uModels;
-}
-ParameterBlock<DrawFreq> drawFreq;
+    StructuredBuffer<S_Model> models;
+};
+ParameterBlock<Draw> draw;
 
-struct VSInput {
-    float4 aPosition : POSITION;
-    float4 aNormal   : NORMAL;
-    float4 aTangent  : TANGENT;
-    float2 aTexCoord : TEXCOORD0;
-    // float4 aColor    : COLOR0;    // Or COLOR<n>
-    // uint4  aJoints   : BLENDINDICES0; // Or BLENDINDICES<n>
-    // float4 aWeights  : BLENDWEIGHT0; // Or BLENDWEIGHT<n>
+struct View
+{
+    ConstantBuffer<S_Camera> cameras;
+};
+ParameterBlock<View> view;
+
+struct A2V
+{
+    float4 aPosition;
+    float4 aNormal;
+    float4 aTangent;
+    float2 aTexCoord;
 };
 
-// Vertex Shader Outputs (Varyings + Position) using Semantics
-struct VSOutput {
-    float4 vPosition : V_WORLD_POSITION;
-    float4 vNormal   : V_WORLD_NORMAL;
-    // float4 vTangent  : V_TANGENT;      // Example custom semantic
-    // float2 vTexCoord : TEXCOORD0;      // Can often re-use input semantics for pass-through
-    // float4 vColor    : COLOR0;         // Can often re-use input semantics for pass-through
+struct V2F
+{
+    float4 vPosition;
+    float4 vNormal;
+    float4 vTangent;
+    float2 vTexCoord;
 
-    // System value semantic for clip space position (required)
-    float4 gl_Position : SV_Position;
+    float4 cPosition : SV_Position;
 };
 
 [shader("vertex")]
-VSOutput main(uniform uint modelIndex, VSInput input)
+V2F vs(uniform uint modelIdx, A2V a2v)
 {
-    VSOutput output;
+    V2F v2f;
+    var model = draw.models[modelIdx];
 
-    // Access uniforms via parameter blocks and push constants
-    ModelUniform modelData = drawFreq.uModels[modelIndex];
+    var funnyLightShit = frame.lights[0].position.x;
 
-    float4 worldPosition = mul(modelData.model, input.aPosition);
-    float4 worldNormal   = mul(modelData.modelInvTranspose, input.aNormal);
+    float4 wPosition = mul(model.model, a2v.aPosition);
+    float4 wNormal   = mul(model.modelInvTranspose, a2v.aNormal);
 
-    output.vPosition = worldPosition;
-    output.vNormal   = worldNormal;
-    output.gl_Position = mul(frameFreq.uCamera.proj, mul(frameFreq.uCamera.view, worldPosition));
+    // random data to make sure slang does not optimize away unused
+    v2f.vTexCoord.x = frame.globals.time + frame.lights[0].position.x + a2v.aTangent.x + a2v.aTexCoord.x;
 
-    return output;
+    v2f.vPosition = wPosition;
+    v2f.vNormal   = wNormal;
+    v2f.cPosition = mul(view.cameras.proj * view.cameras.view, wPosition);
+
+    return v2f;
 }
 
 [shader("fragment")]
-float4 fs() : SV_Target
+float4 fs(V2F v2f) : SV_Target
 {
-    return float4(1.0);
+    float4 color = float4(0.0, 0.0, 0.0, 1.0);
+    float3 norm = normalize(v2f.vNormal.xyz);
+
+    for (int i = 0; i < frame.lights.getCount(); i++)
+    {
+        float3 lightDir = normalize(frame.lights[i].position.xyz - v2f.vPosition.xyz);
+        float nDotL = max(dot(norm, lightDir), 0.0);
+        color.xyz += nDotL * frame.lights[i].color.xyz;
+    }
+
+    return color;
 }

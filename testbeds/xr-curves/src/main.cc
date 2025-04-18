@@ -1,6 +1,7 @@
 #include "Allocator.hh"
 #include "Buffer.hh"
 #include "Camera.hh"
+#include "Curves.hh"
 #include "Descriptor.hh"
 #include "Device.hh"
 #include "Image.hh"
@@ -10,6 +11,7 @@
 #include "Points.hh"
 #include "Swapchain.hh"
 #include "Window.hh"
+
 #include "xr.hh"
 
 std::filesystem::path resourcePath = "../resources/";
@@ -42,7 +44,7 @@ struct App
 {
     std::unique_ptr<letc::Instance> instance;
     vkfw::UniqueWindow window;
-    vk::UniqueSurfaceKHR surface;
+    // vk::UniqueSurfaceKHR surface;
 
     std::unique_ptr<letc::Device> device;
     std::unique_ptr<letc::Allocator> allocator;
@@ -71,6 +73,9 @@ struct App
     std::unique_ptr<letc::Points> points;
     std::unique_ptr<letc::PointsRenderer> pointsRenderer;
 
+    std::unique_ptr<letc::CurvesRenderer> curvesRenderer;
+    std::unique_ptr<letc::Curves> curves;
+
     XrContext xrCtx;
 
     double lastMouseX, lastMouseY;
@@ -81,6 +86,7 @@ struct App
         // basic initialization
         VULKAN_HPP_DEFAULT_DISPATCHER.init();
         vkfw::init();
+        vkfw::initHint<vkfw::InitializationHint::ePlatform>(vkfw::Platform::eX11);
 
         // window and vulkan initialization
         vkfw::WindowHints windowHints{};
@@ -92,9 +98,9 @@ struct App
                                                  .addInstanceExtension("VK_KHR_get_physical_device_properties2"));
         VULKAN_HPP_DEFAULT_DISPATCHER.init(instance->instance);
 
-        // window surface creation
-        surface = vkfw::createWindowSurfaceUnique(*instance, *window);
-        assertThrow(surface, "failed to create surface");
+        // // window surface creation
+        // surface = vkfw::createWindowSurfaceUnique(*instance, *window);
+        // assertThrow(surface, "failed to create surface");
 
         letc::DeviceBuilder deviceBuilder;
         deviceBuilder.requestDevice(xrCtx.getGraphicsDevice(*instance));
@@ -113,21 +119,21 @@ struct App
                                             vk::ShaderStageFlagBits::eAllGraphics);
         descriptorManager->addLayoutBinding("pbrGlobalLayout", 1, vk::DescriptorType::eStorageBuffer,
                                             vk::ShaderStageFlagBits::eAllGraphics);
-        descriptorManager->addLayoutBinding("pbrGlobalLayout", 2, vk::DescriptorType::eUniformBuffer,
-                                            vk::ShaderStageFlagBits::eAllGraphics);
         descriptorManager->createLayout("pbrGlobalLayout");
 
         descriptorManager->addLayoutBinding("pbrModelLayout", 0, vk::DescriptorType::eStorageBuffer,
                                             vk::ShaderStageFlagBits::eAllGraphics);
         descriptorManager->createLayout("pbrModelLayout");
 
-        descriptorManager->addLayoutBinding("pointsCameraLayout", 0, vk::DescriptorType::eUniformBuffer,
+        descriptorManager->addLayoutBinding("soloCameraLayout", 0, vk::DescriptorType::eUniformBuffer,
                                             vk::ShaderStageFlagBits::eAllGraphics);
-        descriptorManager->createLayout("pointsCameraLayout");
+        descriptorManager->createLayout("soloCameraLayout");
 
         descriptorManager->createSet("pbrGlobalLayout", "pbrGlobalSet");
         descriptorManager->createSet("pbrModelLayout", "pbrModelSet");
-        descriptorManager->createSet("pointsCameraLayout", "pointsCameraSet");
+
+        descriptorManager->createSet("soloCameraLayout", "soloCamera0");
+        descriptorManager->createSet("soloCameraLayout", "soloCamera1");
 
         // command buffer initialization
         commandPool =
@@ -184,13 +190,22 @@ struct App
                                            vk::BufferUsageFlagBits::eStorageBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
         // *** Initialize ModelRenderer ***
-        modelRenderer = std::make_unique<letc::ModelRenderer>(
-            *allocator, *device, readFile(resourcePath / "pbr.vert.spv"), readFile(resourcePath / "pbr.frag.spv"));
+        // modelRenderer = std::make_unique<letc::ModelRenderer>(
+        //     *allocator, *device, readFile(resourcePath / "pbr.vert.spirv"), readFile(resourcePath /
+        //     "pbr.frag.spirv"));
+
+        modelRenderer =
+            std::make_unique<letc::ModelRenderer>(*allocator, *device, readFile(resourcePath / "pbr/pbr.spirv"));
 
         points = std::make_unique<letc::Points>(*allocator);
         pointsRenderer =
             std::make_unique<letc::PointsRenderer>(*allocator, *device, readFile(resourcePath / "points.vert.spv"),
                                                    readFile(resourcePath / "points.frag.spv"));
+
+        curves = std::make_unique<letc::Curves>(*allocator);
+        curvesRenderer =
+            std::make_unique<letc::CurvesRenderer>(*allocator, *device, readFile(resourcePath / "curves/curves.spirv"),
+                                                   readFile(resourcePath / "curves/curves.spirv"));
 
         std::tie(lastMouseX, lastMouseY) = window->getCursorPos();
 
@@ -318,14 +333,12 @@ struct App
         {
             auto &rs = renderingStates[state];
 
+            descriptorManager->attachBuffer(std::format("soloCamera{}", state), 0, rs.camera->buffer->buffer,
+                                            sizeof(letc::Camera::Uniform));
+
             vk::UniqueCommandBuffer &commandBuffer = commandBuffers.at(state);
             commandBuffer->reset(vk::CommandBufferResetFlagBits::eReleaseResources);
             commandBuffer->begin(vk::CommandBufferBeginInfo{}.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-
-            descriptorManager->attachBuffer("pbrGlobalSet", 2, rs.camera->buffer->buffer,
-                                            sizeof(letc::Camera::Uniform));
-            descriptorManager->attachBuffer("pointsCameraSet", 0, rs.camera->buffer->buffer,
-                                            sizeof(letc::Camera::Uniform));
 
             vk::Rect2D scissor({0, 0}, {rs.width, rs.height});
             commandBuffer->setScissor(0, 1, &scissor);
@@ -373,7 +386,8 @@ struct App
             // *** Render models using ModelRenderer and push constants ***
             modelRenderer->pipeline->bind(commandBuffer.get());
 
-            auto sets = descriptorManager->organizeSets("pbrGlobalSet", "pbrModelSet");
+            auto sets =
+                descriptorManager->organizeSets("pbrGlobalSet", "pbrModelSet", std::format("soloCamera{}", state));
             commandBuffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, modelRenderer->pipeline->layout, 0,
                                               sets.size(), sets.data(), 0, nullptr);
 
@@ -385,7 +399,7 @@ struct App
             }
 
             pointsRenderer->pipeline->bind(commandBuffer.get());
-            sets = descriptorManager->organizeSets("pointsCameraSet");
+            sets = descriptorManager->organizeSets(std::format("soloCamera{}", state));
             commandBuffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pointsRenderer->pipeline->layout, 0,
                                               sets.size(), sets.data(), 0, nullptr);
             points->draw(*commandBuffer);

@@ -24,20 +24,53 @@ namespace letc
         std::unique_ptr<DescriptorLayout> layout;
         std::unique_ptr<GraphicsPipeline> pipeline;
 
-        ModelRenderer(const Allocator &allocator, const Device &device, const std::vector<char> &vertexCode,
-                      const std::vector<char> &fragmentCode)
+        ModelRenderer(const Allocator &allocator, const Device &device, const std::vector<char> &code)
             : allocator(allocator), device(device)
         {
             layout = std::make_unique<DescriptorLayout>(device);
             layout->addBinding(0, 0, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eAllGraphics, 1);
             layout->addBinding(0, 1, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eAllGraphics, 1);
-            layout->addBinding(0, 2, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eAllGraphics, 1);
             layout->addBinding(1, 0, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eAllGraphics, 1);
+            layout->addBinding(2, 0, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eAllGraphics, 1);
             layout->generateLayouts();
 
             letc::GraphicsPipelineBuilder gpb;
-            gpb.addShaderStage(vertexCode, vk::ShaderStageFlagBits::eVertex);
-            gpb.addShaderStage(fragmentCode, vk::ShaderStageFlagBits::eFragment);
+            gpb.addShaderStage(code, vk::ShaderStageFlagBits::eVertex, "vs");
+            gpb.addShaderStage(code, vk::ShaderStageFlagBits::eFragment, "fs");
+            gpb.addVertexInputBinding(0, sizeof(glm::vec4), vk::VertexInputRate::eVertex); // Position
+            gpb.addVertexInputAttribute(0, 0, vk::Format::eR32G32B32A32Sfloat, 0);
+            gpb.addVertexInputBinding(1, sizeof(glm::vec4), vk::VertexInputRate::eVertex); // Normal
+            gpb.addVertexInputAttribute(1, 1, vk::Format::eR32G32B32A32Sfloat, 0);
+            gpb.addVertexInputBinding(2, sizeof(glm::vec4), vk::VertexInputRate::eVertex); // Tangent
+            gpb.addVertexInputAttribute(2, 2, vk::Format::eR32G32B32A32Sfloat, 0);
+            gpb.addVertexInputBinding(3, sizeof(glm::vec2), vk::VertexInputRate::eVertex); // UV
+            gpb.addVertexInputAttribute(3, 3, vk::Format::eR32G32Sfloat, 0);
+            gpb.addPushConstantRange(vk::PushConstantRange{}
+                                         .setSize(sizeof(uint32_t))
+                                         .setOffset(0)
+                                         .setStageFlags(vk::ShaderStageFlagBits::eAllGraphics));
+            gpb.setLayout(layout.get());
+            auto fmt = vk::Format::eR8G8B8A8Srgb;
+            gpb.renderingInfo.setColorAttachmentFormats(fmt);
+            gpb.setRasterization(gpb.rasterizationInfo.setCullMode(vk::CullModeFlagBits::eNone));
+
+            pipeline = std::make_unique<GraphicsPipeline>(device, gpb);
+        }
+
+        ModelRenderer(const Allocator &allocator, const Device &device, const std::vector<char> &vs,
+                      const std::vector<char> &fs)
+            : allocator(allocator), device(device)
+        {
+            layout = std::make_unique<DescriptorLayout>(device);
+            layout->addBinding(0, 0, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eAllGraphics, 1);
+            layout->addBinding(0, 1, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eAllGraphics, 1);
+            layout->addBinding(1, 0, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eAllGraphics, 1);
+            layout->addBinding(2, 0, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eAllGraphics, 1);
+            layout->generateLayouts();
+
+            letc::GraphicsPipelineBuilder gpb;
+            gpb.addShaderStage(vs, vk::ShaderStageFlagBits::eVertex);
+            gpb.addShaderStage(fs, vk::ShaderStageFlagBits::eFragment);
             gpb.addVertexInputBinding(0, sizeof(glm::vec4), vk::VertexInputRate::eVertex); // Position
             gpb.addVertexInputAttribute(0, 0, vk::Format::eR32G32B32A32Sfloat, 0);
             gpb.addVertexInputBinding(1, sizeof(glm::vec4), vk::VertexInputRate::eVertex); // Normal

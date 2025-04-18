@@ -1,21 +1,21 @@
 {
     "parameters": [
         {
-            "name": "frameFreq",
+            "name": "frame",
             "binding": {"kind": "subElementRegisterSpace", "index": 0},
             "type": {
                 "kind": "parameterBlock",
                 "elementType": {
                     "kind": "struct",
-                    "name": "FrameFreq",
+                    "name": "Frame",
                     "fields": [
                         {
-                            "name": "uGlobal",
+                            "name": "globals",
                             "type": {
                                 "kind": "constantBuffer",
                                 "elementType": {
                                     "kind": "struct",
-                                    "name": "GlobalUniforms",
+                                    "name": "S_Global",
                                     "fields": [
                                         {
                                             "name": "time",
@@ -41,7 +41,7 @@
                                 "elementVarLayout": {
                                     "type": {
                                         "kind": "struct",
-                                        "name": "GlobalUniforms",
+                                        "name": "S_Global",
                                         "fields": [
                                             {
                                                 "name": "time",
@@ -73,7 +73,7 @@
                                 "baseShape": "structuredBuffer",
                                 "resultType": {
                                     "kind": "struct",
-                                    "name": "Light",
+                                    "name": "S_Light",
                                     "fields": [
                                         {
                                             "name": "position",
@@ -103,83 +103,6 @@
                                 }
                             },
                             "binding": {"kind": "descriptorTableSlot", "index": 1}
-                        },
-                        {
-                            "name": "uCamera",
-                            "type": {
-                                "kind": "constantBuffer",
-                                "elementType": {
-                                    "kind": "struct",
-                                    "name": "CameraUniforms",
-                                    "fields": [
-                                        {
-                                            "name": "view",
-                                            "type": {
-                                                "kind": "matrix",
-                                                "rowCount": 4,
-                                                "columnCount": 4,
-                                                "elementType": {
-                                                    "kind": "scalar",
-                                                    "scalarType": "float32"
-                                                }
-                                            },
-                                            "binding": {"kind": "uniform", "offset": 0, "size": 64}
-                                        },
-                                        {
-                                            "name": "proj",
-                                            "type": {
-                                                "kind": "matrix",
-                                                "rowCount": 4,
-                                                "columnCount": 4,
-                                                "elementType": {
-                                                    "kind": "scalar",
-                                                    "scalarType": "float32"
-                                                }
-                                            },
-                                            "binding": {"kind": "uniform", "offset": 64, "size": 64}
-                                        }
-                                    ]
-                                },
-                                "containerVarLayout": {
-                                    "binding": {"kind": "descriptorTableSlot", "index": 0}
-                                },
-                                "elementVarLayout": {
-                                    "type": {
-                                        "kind": "struct",
-                                        "name": "CameraUniforms",
-                                        "fields": [
-                                            {
-                                                "name": "view",
-                                                "type": {
-                                                    "kind": "matrix",
-                                                    "rowCount": 4,
-                                                    "columnCount": 4,
-                                                    "elementType": {
-                                                        "kind": "scalar",
-                                                        "scalarType": "float32"
-                                                    }
-                                                },
-                                                "binding": {"kind": "uniform", "offset": 0, "size": 64}
-                                            },
-                                            {
-                                                "name": "proj",
-                                                "type": {
-                                                    "kind": "matrix",
-                                                    "rowCount": 4,
-                                                    "columnCount": 4,
-                                                    "elementType": {
-                                                        "kind": "scalar",
-                                                        "scalarType": "float32"
-                                                    }
-                                                },
-                                                "binding": {"kind": "uniform", "offset": 64, "size": 64}
-                                            }
-                                        ]
-                                    },
-                                    "binding": {"kind": "uniform", "offset": 0, "size": 128}
-                                }
-                            },
-                            "binding": {"kind": "descriptorTableSlot", "index": 2}
                         }
                     ]
                 },
@@ -189,15 +112,15 @@
                 "elementVarLayout": {
                     "type": {
                         "kind": "struct",
-                        "name": "FrameFreq",
+                        "name": "Frame",
                         "fields": [
                             {
-                                "name": "uGlobal",
+                                "name": "globals",
                                 "type": {
                                     "kind": "constantBuffer",
                                     "elementType": {
                                         "kind": "struct",
-                                        "name": "GlobalUniforms",
+                                        "name": "S_Global",
                                         "fields": [
                                             {
                                                 "name": "time",
@@ -223,7 +146,7 @@
                                     "elementVarLayout": {
                                         "type": {
                                             "kind": "struct",
-                                            "name": "GlobalUniforms",
+                                            "name": "S_Global",
                                             "fields": [
                                                 {
                                                     "name": "time",
@@ -255,7 +178,7 @@
                                     "baseShape": "structuredBuffer",
                                     "resultType": {
                                         "kind": "struct",
-                                        "name": "Light",
+                                        "name": "S_Light",
                                         "fields": [
                                             {
                                                 "name": "position",
@@ -285,107 +208,30 @@
                                     }
                                 },
                                 "binding": {"kind": "descriptorTableSlot", "index": 1}
-                            },
-                            {
-                                "name": "uCamera",
-                                "type": {
-                                    "kind": "constantBuffer",
-                                    "elementType": {
-                                        "kind": "struct",
-                                        "name": "CameraUniforms",
-                                        "fields": [
-                                            {
-                                                "name": "view",
-                                                "type": {
-                                                    "kind": "matrix",
-                                                    "rowCount": 4,
-                                                    "columnCount": 4,
-                                                    "elementType": {
-                                                        "kind": "scalar",
-                                                        "scalarType": "float32"
-                                                    }
-                                                },
-                                                "binding": {"kind": "uniform", "offset": 0, "size": 64}
-                                            },
-                                            {
-                                                "name": "proj",
-                                                "type": {
-                                                    "kind": "matrix",
-                                                    "rowCount": 4,
-                                                    "columnCount": 4,
-                                                    "elementType": {
-                                                        "kind": "scalar",
-                                                        "scalarType": "float32"
-                                                    }
-                                                },
-                                                "binding": {"kind": "uniform", "offset": 64, "size": 64}
-                                            }
-                                        ]
-                                    },
-                                    "containerVarLayout": {
-                                        "binding": {"kind": "descriptorTableSlot", "index": 0}
-                                    },
-                                    "elementVarLayout": {
-                                        "type": {
-                                            "kind": "struct",
-                                            "name": "CameraUniforms",
-                                            "fields": [
-                                                {
-                                                    "name": "view",
-                                                    "type": {
-                                                        "kind": "matrix",
-                                                        "rowCount": 4,
-                                                        "columnCount": 4,
-                                                        "elementType": {
-                                                            "kind": "scalar",
-                                                            "scalarType": "float32"
-                                                        }
-                                                    },
-                                                    "binding": {"kind": "uniform", "offset": 0, "size": 64}
-                                                },
-                                                {
-                                                    "name": "proj",
-                                                    "type": {
-                                                        "kind": "matrix",
-                                                        "rowCount": 4,
-                                                        "columnCount": 4,
-                                                        "elementType": {
-                                                            "kind": "scalar",
-                                                            "scalarType": "float32"
-                                                        }
-                                                    },
-                                                    "binding": {"kind": "uniform", "offset": 64, "size": 64}
-                                                }
-                                            ]
-                                        },
-                                        "binding": {"kind": "uniform", "offset": 0, "size": 128}
-                                    }
-                                },
-                                "binding": {"kind": "descriptorTableSlot", "index": 2}
                             }
                         ]
                     },
-                    "binding": {"kind": "descriptorTableSlot", "index": 0, "count": 3}
+                    "binding": {"kind": "descriptorTableSlot", "index": 0, "count": 2}
                 }
             }
         },
         {
-            "name": "drawFreq",
+            "name": "draw",
             "binding": {"kind": "subElementRegisterSpace", "index": 1},
             "type": {
                 "kind": "parameterBlock",
                 "elementType": {
                     "kind": "struct",
-                    "name": "DrawFreq",
+                    "name": "Draw",
                     "fields": [
                         {
-                            "name": "uModels",
+                            "name": "models",
                             "type": {
                                 "kind": "resource",
                                 "baseShape": "structuredBuffer",
                                 "resultType": {
                                     "kind": "struct",
-                                    "name": "ModelUniform",
+                                    "name": "S_Model",
                                     "fields": [
                                         {
                                             "name": "model",
@@ -450,16 +296,16 @@
                 "elementVarLayout": {
                     "type": {
                         "kind": "struct",
-                        "name": "DrawFreq",
+                        "name": "Draw",
                         "fields": [
                             {
-                                "name": "uModels",
+                                "name": "models",
                                 "type": {
                                     "kind": "resource",
                                     "baseShape": "structuredBuffer",
                                     "resultType": {
                                         "kind": "struct",
-                                        "name": "ModelUniform",
+                                        "name": "S_Model",
                                         "fields": [
                                             {
                                                 "name": "model",
@@ -521,15 +367,194 @@
                     "binding": {"kind": "descriptorTableSlot", "index": 0}
                 }
             }
+        },
+        {
+            "name": "view",
+            "binding": {"kind": "subElementRegisterSpace", "index": 2},
+            "type": {
+                "kind": "parameterBlock",
+                "elementType": {
+                    "kind": "struct",
+                    "name": "View",
+                    "fields": [
+                        {
+                            "name": "cameras",
+                            "type": {
+                                "kind": "constantBuffer",
+                                "elementType": {
+                                    "kind": "struct",
+                                    "name": "S_Camera",
+                                    "fields": [
+                                        {
+                                            "name": "view",
+                                            "type": {
+                                                "kind": "matrix",
+                                                "rowCount": 4,
+                                                "columnCount": 4,
+                                                "elementType": {
+                                                    "kind": "scalar",
+                                                    "scalarType": "float32"
+                                                }
+                                            },
+                                            "binding": {"kind": "uniform", "offset": 0, "size": 64}
+                                        },
+                                        {
+                                            "name": "proj",
+                                            "type": {
+                                                "kind": "matrix",
+                                                "rowCount": 4,
+                                                "columnCount": 4,
+                                                "elementType": {
+                                                    "kind": "scalar",
+                                                    "scalarType": "float32"
+                                                }
+                                            },
+                                            "binding": {"kind": "uniform", "offset": 64, "size": 64}
+                                        }
+                                    ]
+                                },
+                                "containerVarLayout": {
+                                    "binding": {"kind": "descriptorTableSlot", "index": 0}
+                                },
+                                "elementVarLayout": {
+                                    "type": {
+                                        "kind": "struct",
+                                        "name": "S_Camera",
+                                        "fields": [
+                                            {
+                                                "name": "view",
+                                                "type": {
+                                                    "kind": "matrix",
+                                                    "rowCount": 4,
+                                                    "columnCount": 4,
+                                                    "elementType": {
+                                                        "kind": "scalar",
+                                                        "scalarType": "float32"
+                                                    }
+                                                },
+                                                "binding": {"kind": "uniform", "offset": 0, "size": 64}
+                                            },
+                                            {
+                                                "name": "proj",
+                                                "type": {
+                                                    "kind": "matrix",
+                                                    "rowCount": 4,
+                                                    "columnCount": 4,
+                                                    "elementType": {
+                                                        "kind": "scalar",
+                                                        "scalarType": "float32"
+                                                    }
+                                                },
+                                                "binding": {"kind": "uniform", "offset": 64, "size": 64}
+                                            }
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 0, "size": 128}
+                                }
+                            },
+                            "binding": {"kind": "descriptorTableSlot", "index": 0}
+                        }
+                    ]
+                },
+                "containerVarLayout": {
+                    "binding": {"kind": "subElementRegisterSpace", "index": 0}
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "struct",
+                        "name": "View",
+                        "fields": [
+                            {
+                                "name": "cameras",
+                                "type": {
+                                    "kind": "constantBuffer",
+                                    "elementType": {
+                                        "kind": "struct",
+                                        "name": "S_Camera",
+                                        "fields": [
+                                            {
+                                                "name": "view",
+                                                "type": {
+                                                    "kind": "matrix",
+                                                    "rowCount": 4,
+                                                    "columnCount": 4,
+                                                    "elementType": {
+                                                        "kind": "scalar",
+                                                        "scalarType": "float32"
+                                                    }
+                                                },
+                                                "binding": {"kind": "uniform", "offset": 0, "size": 64}
+                                            },
+                                            {
+                                                "name": "proj",
+                                                "type": {
+                                                    "kind": "matrix",
+                                                    "rowCount": 4,
+                                                    "columnCount": 4,
+                                                    "elementType": {
+                                                        "kind": "scalar",
+                                                        "scalarType": "float32"
+                                                    }
+                                                },
+                                                "binding": {"kind": "uniform", "offset": 64, "size": 64}
+                                            }
+                                        ]
+                                    },
+                                    "containerVarLayout": {
+                                        "binding": {"kind": "descriptorTableSlot", "index": 0}
+                                    },
+                                    "elementVarLayout": {
+                                        "type": {
+                                            "kind": "struct",
+                                            "name": "S_Camera",
+                                            "fields": [
+                                                {
+                                                    "name": "view",
+                                                    "type": {
+                                                        "kind": "matrix",
+                                                        "rowCount": 4,
+                                                        "columnCount": 4,
+                                                        "elementType": {
+                                                            "kind": "scalar",
+                                                            "scalarType": "float32"
+                                                        }
+                                                    },
+                                                    "binding": {"kind": "uniform", "offset": 0, "size": 64}
+                                                },
+                                                {
+                                                    "name": "proj",
+                                                    "type": {
+                                                        "kind": "matrix",
+                                                        "rowCount": 4,
+                                                        "columnCount": 4,
+                                                        "elementType": {
+                                                            "kind": "scalar",
+                                                            "scalarType": "float32"
+                                                        }
+                                                    },
+                                                    "binding": {"kind": "uniform", "offset": 64, "size": 64}
+                                                }
+                                            ]
+                                        },
+                                        "binding": {"kind": "uniform", "offset": 0, "size": 128}
+                                    }
+                                },
+                                "binding": {"kind": "descriptorTableSlot", "index": 0}
+                            }
+                        ]
+                    },
+                    "binding": {"kind": "descriptorTableSlot", "index": 0}
+                }
+            }
         }
     ],
     "entryPoints": [
         {
-            "name": "main",
+            "name": "vs",
             "stage": "vertex",
             "parameters": [
                 {
-                    "name": "modelIndex",
+                    "name": "modelIdx",
                     "binding": {"kind": "uniform", "offset": 0, "size": 4},
                     "type": {
                         "kind": "scalar",
@@ -537,12 +562,12 @@
                     }
                 },
                 {
-                    "name": "input",
+                    "name": "a2v",
                     "stage": "vertex",
                     "binding": {"kind": "varyingInput", "index": 0, "count": 4},
                     "type": {
                         "kind": "struct",
-                        "name": "VSInput",
+                        "name": "A2V",
                         "fields": [
                             {
                                 "name": "aPosition",
@@ -555,8 +580,7 @@
                                     }
                                 },
                                 "stage": "vertex",
-                                "binding": {"kind": "varyingInput", "index": 0},
-                                "semanticName": "POSITION"
+                                "binding": {"kind": "varyingInput", "index": 0}
                             },
                             {
                                 "name": "aNormal",
@@ -569,8 +593,7 @@
                                     }
                                 },
                                 "stage": "vertex",
-                                "binding": {"kind": "varyingInput", "index": 1},
-                                "semanticName": "NORMAL"
+                                "binding": {"kind": "varyingInput", "index": 1}
                             },
                             {
                                 "name": "aTangent",
@@ -583,8 +606,7 @@
                                     }
                                 },
                                 "stage": "vertex",
-                                "binding": {"kind": "varyingInput", "index": 2},
-                                "semanticName": "TANGENT"
+                                "binding": {"kind": "varyingInput", "index": 2}
                             },
                             {
                                 "name": "aTexCoord",
@@ -597,8 +619,7 @@
                                     }
                                 },
                                 "stage": "vertex",
-                                "binding": {"kind": "varyingInput", "index": 3},
-                                "semanticName": "TEXCOORD"
+                                "binding": {"kind": "varyingInput", "index": 3}
                             }
                         ]
                     }
@@ -606,41 +627,76 @@
             ],
             "result": {
                 "stage": "vertex",
-                "binding": {"kind": "varyingOutput", "index": 0, "count": 2},
+                "binding": {"kind": "varyingOutput", "index": 0, "count": 4},
                 "type": {
                     "kind": "struct",
-                    "name": "VSOutput",
+                    "name": "TrueOut",
                     "fields": [
                         {
-                            "name": "vPosition",
+                            "name": "vOut",
                             "type": {
-                                "kind": "vector",
-                                "elementCount": 4,
-                                "elementType": {
-                                    "kind": "scalar",
-                                    "scalarType": "float32"
-                                }
+                                "kind": "struct",
+                                "name": "V2F",
+                                "fields": [
+                                    {
+                                        "name": "vPosition",
+                                        "type": {
+                                            "kind": "vector",
+                                            "elementCount": 4,
+                                            "elementType": {
+                                                "kind": "scalar",
+                                                "scalarType": "float32"
+                                            }
+                                        },
+                                        "stage": "vertex",
+                                        "binding": {"kind": "varyingOutput", "index": 0}
+                                    },
+                                    {
+                                        "name": "vNormal",
+                                        "type": {
+                                            "kind": "vector",
+                                            "elementCount": 4,
+                                            "elementType": {
+                                                "kind": "scalar",
+                                                "scalarType": "float32"
+                                            }
+                                        },
+                                        "stage": "vertex",
+                                        "binding": {"kind": "varyingOutput", "index": 1}
+                                    },
+                                    {
+                                        "name": "vTangent",
+                                        "type": {
+                                            "kind": "vector",
+                                            "elementCount": 4,
+                                            "elementType": {
+                                                "kind": "scalar",
+                                                "scalarType": "float32"
+                                            }
+                                        },
+                                        "stage": "vertex",
+                                        "binding": {"kind": "varyingOutput", "index": 2}
+                                    },
+                                    {
+                                        "name": "vTexCoord",
+                                        "type": {
+                                            "kind": "vector",
+                                            "elementCount": 2,
+                                            "elementType": {
+                                                "kind": "scalar",
+                                                "scalarType": "float32"
+                                            }
+                                        },
+                                        "stage": "vertex",
+                                        "binding": {"kind": "varyingOutput", "index": 3}
+                                    }
+                                ]
                             },
                             "stage": "vertex",
-                            "binding": {"kind": "varyingOutput", "index": 0},
-                            "semanticName": "V_WORLD_POSITION"
+                            "binding": {"kind": "varyingOutput", "index": 0, "count": 4}
                         },
                         {
-                            "name": "vNormal",
-                            "type": {
-                                "kind": "vector",
-                                "elementCount": 4,
-                                "elementType": {
-                                    "kind": "scalar",
-                                    "scalarType": "float32"
-                                }
-                            },
-                            "stage": "vertex",
-                            "binding": {"kind": "varyingOutput", "index": 1},
-                            "semanticName": "V_WORLD_NORMAL"
-                        },
-                        {
-                            "name": "gl_Position",
+                            "name": "cPosition",
                             "type": {
                                 "kind": "vector",
                                 "elementCount": 4,
@@ -656,18 +712,87 @@
             },
             "bindings": [
                 {
-                    "name": "frameFreq",
+                    "name": "frame",
                     "binding": {"kind": "subElementRegisterSpace", "index": 0}
                 },
                 {
-                    "name": "drawFreq",
+                    "name": "draw",
                     "binding": {"kind": "subElementRegisterSpace", "index": 1}
+                },
+                {
+                    "name": "view",
+                    "binding": {"kind": "subElementRegisterSpace", "index": 2}
                 }
             ]
         },
         {
             "name": "fs",
             "stage": "fragment",
+            "parameters": [
+                {
+                    "name": "v2f",
+                    "stage": "fragment",
+                    "binding": {"kind": "varyingInput", "index": 0, "count": 4},
+                    "type": {
+                        "kind": "struct",
+                        "name": "V2F",
+                        "fields": [
+                            {
+                                "name": "vPosition",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "stage": "fragment",
+                                "binding": {"kind": "varyingInput", "index": 0}
+                            },
+                            {
+                                "name": "vNormal",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "stage": "fragment",
+                                "binding": {"kind": "varyingInput", "index": 1}
+                            },
+                            {
+                                "name": "vTangent",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "stage": "fragment",
+                                "binding": {"kind": "varyingInput", "index": 2}
+                            },
+                            {
+                                "name": "vTexCoord",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 2,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "stage": "fragment",
+                                "binding": {"kind": "varyingInput", "index": 3}
+                            }
+                        ]
+                    }
+                }
+            ],
             "result": {
                 "stage": "fragment",
                 "binding": {"kind": "varyingOutput", "index": 0},
@@ -683,12 +808,16 @@
             },
             "bindings": [
                 {
-                    "name": "frameFreq",
+                    "name": "frame",
                     "binding": {"kind": "subElementRegisterSpace", "index": 0}
                 },
                 {
-                    "name": "drawFreq",
+                    "name": "draw",
                     "binding": {"kind": "subElementRegisterSpace", "index": 1}
+                },
+                {
+                    "name": "view",
+                    "binding": {"kind": "subElementRegisterSpace", "index": 2}
                 }
             ]
         }

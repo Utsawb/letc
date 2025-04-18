@@ -9,6 +9,7 @@ layout(location = 1) in vec4 vNormal;
 // layout(location = 3) in vec2 vTexCoord;
 // layout(location = 4) in vec4 vColor;
 
+// updated once per frame
 layout(set = 0, binding = 0) uniform GlobalUniforms {
     float time;
     float frame;
@@ -23,11 +24,6 @@ layout(set = 0, binding = 1) buffer Lights {
     Light lights[];
 };
 
-layout(set = 0, binding = 2) uniform CameraUniforms {
-    mat4 view;
-    mat4 proj;
-} uCamera;
-
 struct ModelUniform {
     mat4 model;
     mat4 modelInvTranspose;
@@ -39,9 +35,10 @@ layout(set = 1, binding = 0) buffer ModelUniforms {
     ModelUniform uModels[];
 };
 
-layout(push_constant, std430) uniform pc {
-    uint modelIndex;
-};
+layout(set = 2, binding = 0) uniform CameraUniforms {
+    mat4 view;
+    mat4 proj;
+} uCamera;
 
 // layout(set = 2, binding = 0) uniform MaterialUniforms {
 //     vec4 baseColor;
