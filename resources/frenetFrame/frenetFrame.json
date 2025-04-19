@@ -118,7 +118,8 @@
                 }
             ],
             "result": {
-                "semanticName": "SV_POSITION",
+                "stage": "vertex",
+                "binding": {"kind": "varyingOutput", "index": 0},
                 "type": {
                     "kind": "struct",
                     "name": "V2F",
@@ -145,8 +146,8 @@
                                     "scalarType": "float32"
                                 }
                             },
-                            "semanticName": "SV_POSITION",
-                            "semanticIndex": 1
+                            "stage": "vertex",
+                            "binding": {"kind": "varyingOutput", "index": 0}
                         }
                     ]
                 }

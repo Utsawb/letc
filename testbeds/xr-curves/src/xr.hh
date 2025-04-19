@@ -25,8 +25,12 @@ struct XrContext
     xr::UniqueDynamicActionSet actionSet;
     xr::UniqueDynamicAction triggerAction;
     xr::UniqueDynamicAction joystickAction;
-    xr::UniqueDynamicAction faceButtonAction;
     xr::UniqueDynamicAction handPoseAction;
+
+    xr::UniqueDynamicAction aButtonAction;
+    xr::UniqueDynamicAction bButtonAction;
+    xr::UniqueDynamicAction xButtonAction;
+    xr::UniqueDynamicAction yButtonAction;
 
     std::vector<xr::ViewConfigurationView> viewConfigurationViews;
     xr::UniqueDynamicSpace space;
@@ -123,9 +127,6 @@ struct XrContext
             actionSetInfo.priority = 0;
             actionSet = instance->createActionSetUnique(actionSetInfo, dispatchLoader);
 
-            // Create subaction paths for left and right hands.
-            xr::Path leftHandPath = instance->stringToPath("/user/hand/left", dispatchLoader);
-            xr::Path rightHandPath = instance->stringToPath("/user/hand/right", dispatchLoader);
             std::vector<xr::Path> subactionPaths = {leftHandPath, rightHandPath};
 
             // Create the trigger action (boolean input).
@@ -146,14 +147,46 @@ struct XrContext
             joystickActionInfo.subactionPaths = subactionPaths.data();
             joystickAction = actionSet->createActionUnique(joystickActionInfo, dispatchLoader);
 
-            // Create the face button action (boolean input).
-            xr::ActionCreateInfo faceButtonActionInfo{};
-            std::strcpy(faceButtonActionInfo.actionName, "face_button_press");
-            std::strcpy(faceButtonActionInfo.localizedActionName, "Face Button Press");
-            faceButtonActionInfo.actionType = xr::ActionType::BooleanInput;
-            faceButtonActionInfo.countSubactionPaths = static_cast<uint32_t>(subactionPaths.size());
-            faceButtonActionInfo.subactionPaths = subactionPaths.data();
-            faceButtonAction = actionSet->createActionUnique(faceButtonActionInfo, dispatchLoader);
+            // Create the A button action (boolean input, typically right hand)
+            xr::ActionCreateInfo aButtonActionInfo{};
+            std::strcpy(aButtonActionInfo.actionName, "a_button_press");
+            std::strcpy(aButtonActionInfo.localizedActionName, "A Button Press");
+            aButtonActionInfo.actionType = xr::ActionType::BooleanInput;
+            aButtonActionInfo.countSubactionPaths =
+                static_cast<uint32_t>(subactionPaths.size()); // Still need both subactions for potential remapping
+            aButtonActionInfo.subactionPaths = subactionPaths.data();
+            aButtonAction = actionSet->createActionUnique(aButtonActionInfo, dispatchLoader);
+            assertThrow(aButtonAction, "Failed to create A button action");
+
+            // Create the B button action (boolean input, typically right hand)
+            xr::ActionCreateInfo bButtonActionInfo{};
+            std::strcpy(bButtonActionInfo.actionName, "b_button_press");
+            std::strcpy(bButtonActionInfo.localizedActionName, "B Button Press");
+            bButtonActionInfo.actionType = xr::ActionType::BooleanInput;
+            bButtonActionInfo.countSubactionPaths = static_cast<uint32_t>(subactionPaths.size());
+            bButtonActionInfo.subactionPaths = subactionPaths.data();
+            bButtonAction = actionSet->createActionUnique(bButtonActionInfo, dispatchLoader);
+            assertThrow(bButtonAction, "Failed to create B button action");
+
+            // Create the X button action (boolean input, typically left hand)
+            xr::ActionCreateInfo xButtonActionInfo{};
+            std::strcpy(xButtonActionInfo.actionName, "x_button_press");
+            std::strcpy(xButtonActionInfo.localizedActionName, "X Button Press");
+            xButtonActionInfo.actionType = xr::ActionType::BooleanInput;
+            xButtonActionInfo.countSubactionPaths = static_cast<uint32_t>(subactionPaths.size());
+            xButtonActionInfo.subactionPaths = subactionPaths.data();
+            xButtonAction = actionSet->createActionUnique(xButtonActionInfo, dispatchLoader);
+            assertThrow(xButtonAction, "Failed to create X button action");
+
+            // Create the Y button action (boolean input, typically left hand)
+            xr::ActionCreateInfo yButtonActionInfo{};
+            std::strcpy(yButtonActionInfo.actionName, "y_button_press");
+            std::strcpy(yButtonActionInfo.localizedActionName, "Y Button Press");
+            yButtonActionInfo.actionType = xr::ActionType::BooleanInput;
+            yButtonActionInfo.countSubactionPaths = static_cast<uint32_t>(subactionPaths.size());
+            yButtonActionInfo.subactionPaths = subactionPaths.data();
+            yButtonAction = actionSet->createActionUnique(yButtonActionInfo, dispatchLoader);
+            assertThrow(yButtonAction, "Failed to create Y button action");
 
             // Create a pose action to capture hand position data.
             xr::ActionCreateInfo handPoseActionInfo{};
@@ -176,12 +209,19 @@ struct XrContext
                 {*joystickAction, instance->stringToPath("/user/hand/left/input/thumbstick", dispatchLoader)});
             bindings.push_back(
                 {*joystickAction, instance->stringToPath("/user/hand/right/input/thumbstick", dispatchLoader)});
-            bindings.push_back({*faceButtonAction, instance->stringToPath("/user/hand/left/input/x", dispatchLoader)});
-            bindings.push_back({*faceButtonAction, instance->stringToPath("/user/hand/right/input/a", dispatchLoader)});
             bindings.push_back(
                 {*handPoseAction, instance->stringToPath("/user/hand/left/input/aim/pose", dispatchLoader)});
             bindings.push_back(
                 {*handPoseAction, instance->stringToPath("/user/hand/right/input/aim/pose", dispatchLoader)});
+            // Added individual face button bindings
+            bindings.push_back(
+                {*aButtonAction, instance->stringToPath("/user/hand/right/input/a/click", dispatchLoader)});
+            bindings.push_back(
+                {*bButtonAction, instance->stringToPath("/user/hand/right/input/b/click", dispatchLoader)});
+            bindings.push_back(
+                {*xButtonAction, instance->stringToPath("/user/hand/left/input/x/click", dispatchLoader)});
+            bindings.push_back(
+                {*yButtonAction, instance->stringToPath("/user/hand/left/input/y/click", dispatchLoader)});
 
             xr::InteractionProfileSuggestedBinding suggestedBinding{};
             suggestedBinding.interactionProfile = oculusTouchInteractionProfile;
@@ -341,7 +381,7 @@ struct XrContext
             glm::mat4 leftHand, rightHand = glm::mat4(1.0f);
             bool leftTriggerPressed, rightTriggerPressed = false;
             glm::vec2 leftJoystick, rightJoystick = glm::vec2(0.0);
-            bool leftFacePressed, rightFacePressed = false;
+            bool a, b, x, y = false;
         } eventStatus;
 
         // --- Query OpenXR action states ---
@@ -349,7 +389,7 @@ struct XrContext
         XrActiveActionSet activeActionSet{actionSet->get(), XR_NULL_PATH};
         syncInfo.countActiveActionSets = 1;
         syncInfo.activeActionSets = &activeActionSet;
-        xrSyncActions(session->get(), &syncInfo);
+        session->syncActions(syncInfo);
 
         xr::Time predictedDisplayTime = this->predictedDisplayTime;
 
@@ -422,21 +462,44 @@ struct XrContext
             eventStatus.rightJoystick = rightJoystickPos;
         }
 
-        xr::ActionStateGetInfo faceButtonActionStateInfo{};
-        faceButtonActionStateInfo.action = *faceButtonAction;
-        faceButtonActionStateInfo.subactionPath = leftHandPath;
-        xr::ActionStateBoolean leftFaceButtonState =
-            session->getActionStateBoolean(faceButtonActionStateInfo, dispatchLoader);
-        faceButtonActionStateInfo.subactionPath = rightHandPath;
-        xr::ActionStateBoolean rightFaceButtonState =
-            session->getActionStateBoolean(faceButtonActionStateInfo, dispatchLoader);
-        if (leftFaceButtonState.isActive && leftFaceButtonState.currentState)
+        // Query state for A button (Right Hand)
+        xr::ActionStateGetInfo aButtonStateInfo{};
+        aButtonStateInfo.action = *aButtonAction;
+        aButtonStateInfo.subactionPath = rightHandPath; // Query specific hand for this button
+        xr::ActionStateBoolean aButtonState = session->getActionStateBoolean(aButtonStateInfo, dispatchLoader);
+        if (aButtonState.isActive && aButtonState.currentState)
         {
-            eventStatus.leftFacePressed = true;
+            eventStatus.a = true;
         }
-        if (rightFaceButtonState.isActive && rightFaceButtonState.currentState)
+
+        // Query state for B button (Right Hand)
+        xr::ActionStateGetInfo bButtonStateInfo{};
+        bButtonStateInfo.action = *bButtonAction;
+        bButtonStateInfo.subactionPath = rightHandPath; // Query specific hand
+        xr::ActionStateBoolean bButtonState = session->getActionStateBoolean(bButtonStateInfo, dispatchLoader);
+        if (bButtonState.isActive && bButtonState.currentState)
         {
-            eventStatus.rightFacePressed = true;
+            eventStatus.b = true;
+        }
+
+        // Query state for X button (Left Hand)
+        xr::ActionStateGetInfo xButtonStateInfo{};
+        xButtonStateInfo.action = *xButtonAction;
+        xButtonStateInfo.subactionPath = leftHandPath; // Query specific hand
+        xr::ActionStateBoolean xButtonState = session->getActionStateBoolean(xButtonStateInfo, dispatchLoader);
+        if (xButtonState.isActive && xButtonState.currentState)
+        {
+            eventStatus.x = true;
+        }
+
+        // Query state for Y button (Left Hand)
+        xr::ActionStateGetInfo yButtonStateInfo{};
+        yButtonStateInfo.action = *yButtonAction;
+        yButtonStateInfo.subactionPath = leftHandPath; // Query specific hand
+        xr::ActionStateBoolean yButtonState = session->getActionStateBoolean(yButtonStateInfo, dispatchLoader);
+        if (yButtonState.isActive && yButtonState.currentState)
+        {
+            eventStatus.y = true;
         }
 
         return eventStatus;

@@ -29,16 +29,16 @@ struct A2V
 struct V2F
 {
     float4 position : SV_Position;
-    float3 color;
+    [[vk::location(0)]] float3 color;
 };
 
 
 [shader("vertex")]
-V2F vs(A2V a2v) : SV_Position
+V2F vs(A2V a2v)
 {
     V2F v2f;
 
-    v2f.position = mul(camera.proj * camera.view, float4(positions[a2v.vertexID], 1.0));
+    v2f.position = mul(camera.proj * camera.view * a2v.trans, float4(positions[a2v.vertexID], 1.0));
     v2f.color = colors[a2v.vertexID];
 
     return v2f;

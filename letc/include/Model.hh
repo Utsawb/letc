@@ -35,8 +35,8 @@ namespace letc
             layout->generateLayouts();
 
             letc::GraphicsPipelineBuilder gpb;
-            gpb.addShaderStage(code, vk::ShaderStageFlagBits::eVertex, "vs");
-            gpb.addShaderStage(code, vk::ShaderStageFlagBits::eFragment, "fs");
+            gpb.addShaderStage(code, vk::ShaderStageFlagBits::eVertex);
+            gpb.addShaderStage(code, vk::ShaderStageFlagBits::eFragment);
             gpb.addVertexInputBinding(0, sizeof(glm::vec4), vk::VertexInputRate::eVertex); // Position
             gpb.addVertexInputAttribute(0, 0, vk::Format::eR32G32B32A32Sfloat, 0);
             gpb.addVertexInputBinding(1, sizeof(glm::vec4), vk::VertexInputRate::eVertex); // Normal

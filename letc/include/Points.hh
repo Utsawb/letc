@@ -39,8 +39,9 @@ namespace letc
             gpb.addVertexInputBinding(0, sizeof(glm::vec3), vk::VertexInputRate::eVertex);
             gpb.addVertexInputAttribute(0, 0, vk::Format::eR32G32B32Sfloat, 0);
             gpb.setLayout(layout.get());
-            gpb.inputAssemblyInfo.setTopology(vk::PrimitiveTopology::ePointList);
-            gpb.rasterizationInfo.setPolygonMode(vk::PolygonMode::ePoint);
+            gpb.inputAssemblyInfo.setTopology(vk::PrimitiveTopology::eLineStrip);
+            gpb.rasterizationInfo.setPolygonMode(vk::PolygonMode::eLine);
+            gpb.rasterizationInfo.setLineWidth(5.0f);
             auto fmt = vk::Format::eR8G8B8A8Srgb;
             gpb.renderingInfo.setColorAttachmentCount(1);
             gpb.renderingInfo.setColorAttachmentFormats(fmt);

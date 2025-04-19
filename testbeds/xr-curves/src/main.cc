@@ -171,13 +171,10 @@ struct App
             std::make_unique<letc::Buffer>(*allocator, sizeof(Light) * lights.size(),
                                            vk::BufferUsageFlagBits::eStorageBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-        models.emplace_back(*allocator, resourcePath / "Avocado.glb");
+        models.emplace_back(*allocator, resourcePath / "Avocado.glb"); // Left Hand Model
+        models.emplace_back(*allocator, resourcePath / "Avocado.glb"); // Right Hand Model
         models.emplace_back(*allocator, resourcePath / "pointy.glb");
-        models.emplace_back(*allocator, resourcePath / "Avocado.glb"); // Left Hand Model placeholder?
-        models.emplace_back(*allocator, resourcePath / "Avocado.glb"); // Right Hand Model placeholder?
-        // Remove extra models if not needed, or adjust indices later
-        models.emplace_back(*allocator, resourcePath / "Avocado.glb");
-        models.emplace_back(*allocator, resourcePath / "Avocado.glb");
+        models.emplace_back(*allocator, resourcePath / "fish.glb");
 
         float modelScalingFactor = 10.0f;
         models.at(0).uniform.model *= glm::scale(models.at(0).uniform.model, glm::vec3(modelScalingFactor));
@@ -194,26 +191,19 @@ struct App
                                            vk::BufferUsageFlagBits::eStorageBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
         // *** Initialize ModelRenderer ***
-        // modelRenderer = std::make_unique<letc::ModelRenderer>(
-        //     *allocator, *device, readFile(resourcePath / "pbr.vert.spirv"), readFile(resourcePath /
-        //     "pbr.frag.spirv"));
-
         modelRenderer =
-            std::make_unique<letc::ModelRenderer>(*allocator, *device, readFile(resourcePath / "pbr/pbr.spirv"));
+            std::make_unique<letc::ModelRenderer>(*allocator, *device, readFile(resourcePath / "pbr/pbr.vert.spirv"),
+                                                  readFile(resourcePath / "pbr/pbr.frag.spirv"));
 
         points = std::make_unique<letc::Points>(*allocator);
-        pointsRenderer =
-            std::make_unique<letc::PointsRenderer>(*allocator, *device, readFile(resourcePath / "points.vert.spv"),
-                                                   readFile(resourcePath / "points.frag.spv"));
-
-        curves = std::make_unique<letc::Curves>(*allocator);
-        curvesRenderer =
-            std::make_unique<letc::CurvesRenderer>(*allocator, *device, readFile(resourcePath / "curves/curves.spirv"),
-                                                   readFile(resourcePath / "curves/curves.spirv"));
+        pointsRenderer = std::make_unique<letc::PointsRenderer>(*allocator, *device,
+                                                                readFile(resourcePath / "points/points.vert.spirv"),
+                                                                readFile(resourcePath / "points/points.frag.spirv"));
 
         frenetFrames = std::make_unique<letc::FrenetFrame>(*allocator);
-        frenetRenderer = std::make_unique<letc::FrenetFramesRenderer>(*allocator, *device,
-                                                                      readFile(resourcePath / "curves/curves.spirv"));
+        frenetRenderer = std::make_unique<letc::FrenetFramesRenderer>(
+            *allocator, *device, readFile(resourcePath / "frenetFrame/frenetFrame.vert.spirv"),
+            readFile(resourcePath / "frenetFrame/frenetFrame.frag.spirv"));
 
         std::tie(lastMouseX, lastMouseY) = window->getCursorPos();
 
@@ -221,35 +211,10 @@ struct App
                             device->queues["graphics"].queueFamilyIndex);
     }
 
-    enum Hand
-    {
-        LEFT,
-        RIGHT,
-        INVALID
-    };
-
-    void triggersPressed(Hand hand, const glm::mat4 &handTransform)
-    {
-        points->points.push_back(handTransform[3]);
-    }
-
-    void joystickMoved(Hand hand, const glm::vec2 &joystickPosition)
-    {
-        std::cout << "Joystick moved! Position: (" << joystickPosition.x << ", " << joystickPosition.y << ")\n";
-    }
-
-    const std::chrono::duration<long long, std::milli> BUTTON_DEBOUNCE_TIME = std::chrono::milliseconds(100);
-    std::chrono::time_point<std::chrono::steady_clock> lastButtonPressTime;
-    void faceButtonPressed(const Hand hand)
-    {
-        auto now = std::chrono::steady_clock::now();
-        if (now - lastButtonPressTime >= BUTTON_DEBOUNCE_TIME || hand == Hand::LEFT)
-        {
-            points->points.clear();
-            lastButtonPressTime = now;
-        }
-    }
-
+    const std::chrono::duration<long long, std::milli> BUTTON_DEBOUNCE_TIME = std::chrono::milliseconds(150);
+    std::chrono::time_point<std::chrono::steady_clock> lastButtonPressTime[4];
+    bool shouldAnimate = false;
+    bool shouldShowFrames = true;
     void updateLogic()
     {
         vkfw::pollEvents();
@@ -262,8 +227,6 @@ struct App
         globalUniforms.time = static_cast<float>(vkfw::getTime());
         globalUniforms.frame = static_cast<float>(currentFrame++);
 
-        models.at(0).uniform.model = glm::rotate(models.at(0).uniform.model, 0.01f, glm::vec3(0.0f, 1.0f, 0.0f));
-
         // rotate the lights around the y axis
         for (size_t i = 0; i < lights.size(); ++i)
         {
@@ -273,26 +236,77 @@ struct App
         }
 
         auto eventStatus = xrCtx.updateLogic();
-        models.at(2).uniform.model = eventStatus.leftHand;
-        models.at(3).uniform.model = eventStatus.rightHand;
+        models.at(0).uniform.model = eventStatus.leftHand;
+        models.at(1).uniform.model = eventStatus.rightHand;
 
-        if (eventStatus.leftFacePressed)
-        {
-            faceButtonPressed(Hand::LEFT);
-        }
-        if (eventStatus.rightFacePressed)
-        {
-            faceButtonPressed(Hand::RIGHT);
-        }
         if (eventStatus.leftTriggerPressed)
         {
-            triggersPressed(Hand::LEFT, eventStatus.leftHand);
         }
-        if (eventStatus.rightFacePressed)
+        if (eventStatus.rightTriggerPressed)
         {
-            triggersPressed(Hand::RIGHT, eventStatus.rightHand);
+            points->points.push_back(eventStatus.rightHand[3]);
         }
-        // TODO! add joystick support if needed
+
+        auto now = std::chrono::steady_clock::now();
+        if (eventStatus.a && (now - lastButtonPressTime[0] >= BUTTON_DEBOUNCE_TIME))
+        {
+            frenetFrames->frames.push_back(eventStatus.rightHand);
+            lastButtonPressTime[0] = now;
+        }
+        if (eventStatus.b && (now - lastButtonPressTime[1] >= BUTTON_DEBOUNCE_TIME))
+        {
+            shouldShowFrames = !shouldShowFrames;
+            lastButtonPressTime[1] = now;
+        }
+        if (eventStatus.x && (now - lastButtonPressTime[2] >= BUTTON_DEBOUNCE_TIME))
+        {
+            points->points.clear();
+            frenetFrames->frames.clear();
+            lastButtonPressTime[2] = now;
+        }
+        if (eventStatus.y && (now - lastButtonPressTime[3] >= BUTTON_DEBOUNCE_TIME))
+        {
+            shouldAnimate = !shouldAnimate;
+            lastButtonPressTime[3] = now;
+        }
+
+        if (eventStatus.leftJoystick != glm::vec2{0.0f, 0.0f})
+        {
+        }
+        if (eventStatus.rightJoystick != glm::vec2{0.0f, 0.0f})
+        {
+        }
+
+        if (shouldAnimate)
+        {
+            if (frenetFrames->frames.size() > 1)
+            {
+                float t = fmod(vkfw::getTime(), frenetFrames->frames.size());
+                std::size_t idx0 = std::floor(t);
+                std::size_t idx1 = (idx0 + 1) % frenetFrames->frames.size();
+
+                glm::vec3 t0 = frenetFrames->frames.at(idx0)[3];
+                glm::vec3 t1 = frenetFrames->frames.at(idx1)[3];
+
+                glm::quat r0 = glm::normalize(glm::quat_cast(frenetFrames->frames.at(idx0)));
+                glm::quat r1 = glm::normalize(glm::quat_cast(frenetFrames->frames.at(idx1)));
+
+                t = t - std::floor(t);
+                glm::vec3 tt = (1 - t) * t0 + t * t1;
+                glm::quat rt = glm::normalize(glm::slerp(r0, r1, t));
+
+                models.at(3).uniform.model = glm::translate(glm::mat4(1.0f), tt) * glm::mat4_cast(rt);
+            }
+            else
+            {
+
+                models.at(3).uniform.model = glm::mat4(0.0f);
+            }
+        }
+        else
+        {
+            models.at(3).uniform.model = glm::mat4(0.0f);
+        }
 
         // --- Update modelUniforms SSBO data ---
         for (size_t i = 0; i < models.size(); ++i)
@@ -321,6 +335,7 @@ struct App
         descriptorManager->attachBuffer("pbrModelSet", 0, modelUniformsBuffer->buffer,
                                         sizeof(letc::Model::UniformBuffer) * models.size());
         points->cpy();
+        frenetFrames->cpy();
     }
 
     void xrFrame()
@@ -331,9 +346,6 @@ struct App
         }
 
         auto eyes = xrCtx.getViews();
-        modelUniforms.at(4).model = eyes[0];
-        modelUniforms.at(5).model = eyes[1];
-        modelUniformsBuffer->cpy(modelUniforms.data(), sizeof(letc::Model::UniformBuffer) * models.size());
 
         auto renderingStates = xrCtx.startRendering();
 
@@ -406,11 +418,18 @@ struct App
                 models[i].draw(*commandBuffer);
             }
 
-            pointsRenderer->pipeline->bind(commandBuffer.get());
-            sets = descriptorManager->organizeSets(std::format("soloCamera{}", state));
-            commandBuffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pointsRenderer->pipeline->layout, 0,
-                                              sets.size(), sets.data(), 0, nullptr);
-            points->draw(*commandBuffer);
+            if (shouldShowFrames)
+            {
+                pointsRenderer->pipeline->bind(commandBuffer.get());
+                sets = descriptorManager->organizeSets(std::format("soloCamera{}", state));
+                commandBuffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pointsRenderer->pipeline->layout, 0,
+                                                  sets.size(), sets.data(), 0, nullptr);
+                points->draw(*commandBuffer);
+
+                frenetRenderer->pipeline->bind(commandBuffer.get());
+                frenetFrames->draw(*commandBuffer);
+            }
+
             commandBuffer->endRendering();
 
             // color attachment layout transition
