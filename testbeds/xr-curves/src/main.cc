@@ -80,6 +80,7 @@ struct App
     XrContext xrCtx;
 
     double lastMouseX, lastMouseY;
+    double timeScaling = 1.0f;
 
     std::unique_ptr<letc::Curves> curves;
 
@@ -252,6 +253,13 @@ struct App
         if (eventStatus.a && (now - lastButtonPressTime[0] >= BUTTON_DEBOUNCE_TIME))
         {
             curves = std::make_unique<letc::Curves>(frenetFrames->frames);
+
+            points->points.clear();
+            for (std::size_t i = 0; i < points->capacity; ++i)
+            {
+                points->points.push_back(curves->getInterp((float)i / (float)points->capacity)[3]);
+            }
+
             lastButtonPressTime[0] = now;
         }
         if (eventStatus.b && (now - lastButtonPressTime[1] >= BUTTON_DEBOUNCE_TIME))
@@ -273,6 +281,7 @@ struct App
 
         if (eventStatus.leftJoystick != glm::vec2{0.0f, 0.0f})
         {
+            timeScaling = (eventStatus.leftJoystick.y + 1.0f) / 2.0f;
         }
         if (eventStatus.rightJoystick != glm::vec2{0.0f, 0.0f})
         {
@@ -282,7 +291,7 @@ struct App
         {
             if (frenetFrames->frames.size() > 1)
             {
-                float t = fmod(vkfw::getTime(), frenetFrames->frames.size());
+                float t = fmod(vkfw::getTime() * timeScaling, frenetFrames->frames.size());
 
                 if (curves)
                 {

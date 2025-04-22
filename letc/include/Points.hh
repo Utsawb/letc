@@ -54,7 +54,7 @@ namespace letc
     {
         const Allocator &allocator;
 
-        std::size_t capacity = 1024;
+        std::size_t capacity = 4096;
 
         // attributes can be packed iirc
         std::vector<glm::vec3> points;
