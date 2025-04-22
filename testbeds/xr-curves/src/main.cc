@@ -74,15 +74,14 @@ struct App
     std::unique_ptr<letc::Points> points;
     std::unique_ptr<letc::PointsRenderer> pointsRenderer;
 
-    std::unique_ptr<letc::CurvesRenderer> curvesRenderer;
-    std::unique_ptr<letc::Curves> curves;
-
     std::unique_ptr<letc::FrenetFramesRenderer> frenetRenderer;
     std::unique_ptr<letc::FrenetFrame> frenetFrames;
 
     XrContext xrCtx;
 
     double lastMouseX, lastMouseY;
+
+    std::unique_ptr<letc::Curves> curves;
 
     size_t currentFrame = 0;
     App()
@@ -213,6 +212,7 @@ struct App
 
     const std::chrono::duration<long long, std::milli> BUTTON_DEBOUNCE_TIME = std::chrono::milliseconds(150);
     std::chrono::time_point<std::chrono::steady_clock> lastButtonPressTime[4];
+    std::chrono::time_point<std::chrono::steady_clock> lastTriggerPressTime[2];
     bool shouldAnimate = false;
     bool shouldShowFrames = true;
     void updateLogic()
@@ -239,18 +239,19 @@ struct App
         models.at(0).uniform.model = eventStatus.leftHand;
         models.at(1).uniform.model = eventStatus.rightHand;
 
-        if (eventStatus.leftTriggerPressed)
-        {
-        }
-        if (eventStatus.rightTriggerPressed)
-        {
-            points->points.push_back(eventStatus.rightHand[3]);
-        }
-
         auto now = std::chrono::steady_clock::now();
-        if (eventStatus.a && (now - lastButtonPressTime[0] >= BUTTON_DEBOUNCE_TIME))
+        if (eventStatus.leftTriggerPressed && (now - lastTriggerPressTime[0] >= BUTTON_DEBOUNCE_TIME))
+        {
+            lastTriggerPressTime[0] = now;
+        }
+        if (eventStatus.rightTriggerPressed && (now - lastTriggerPressTime[1] >= BUTTON_DEBOUNCE_TIME))
         {
             frenetFrames->frames.push_back(eventStatus.rightHand);
+            lastTriggerPressTime[1] = now;
+        }
+        if (eventStatus.a && (now - lastButtonPressTime[0] >= BUTTON_DEBOUNCE_TIME))
+        {
+            curves = std::make_unique<letc::Curves>(frenetFrames->frames);
             lastButtonPressTime[0] = now;
         }
         if (eventStatus.b && (now - lastButtonPressTime[1] >= BUTTON_DEBOUNCE_TIME))
@@ -260,8 +261,8 @@ struct App
         }
         if (eventStatus.x && (now - lastButtonPressTime[2] >= BUTTON_DEBOUNCE_TIME))
         {
-            points->points.clear();
             frenetFrames->frames.clear();
+            points->points.clear();
             lastButtonPressTime[2] = now;
         }
         if (eventStatus.y && (now - lastButtonPressTime[3] >= BUTTON_DEBOUNCE_TIME))
@@ -282,20 +283,11 @@ struct App
             if (frenetFrames->frames.size() > 1)
             {
                 float t = fmod(vkfw::getTime(), frenetFrames->frames.size());
-                std::size_t idx0 = std::floor(t);
-                std::size_t idx1 = (idx0 + 1) % frenetFrames->frames.size();
 
-                glm::vec3 t0 = frenetFrames->frames.at(idx0)[3];
-                glm::vec3 t1 = frenetFrames->frames.at(idx1)[3];
-
-                glm::quat r0 = glm::normalize(glm::quat_cast(frenetFrames->frames.at(idx0)));
-                glm::quat r1 = glm::normalize(glm::quat_cast(frenetFrames->frames.at(idx1)));
-
-                t = t - std::floor(t);
-                glm::vec3 tt = (1 - t) * t0 + t * t1;
-                glm::quat rt = glm::normalize(glm::slerp(r0, r1, t));
-
-                models.at(3).uniform.model = glm::translate(glm::mat4(1.0f), tt) * glm::mat4_cast(rt);
+                if (curves)
+                {
+                    models.at(3).uniform.model = curves->getInterp(t);
+                }
             }
             else
             {

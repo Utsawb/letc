@@ -1,7 +1,8 @@
+// pbr.frag.glsl
+// glslc pbr.frag.glsl -o pbr.frag.spirv
+
 #version 450
 #pragma shader_stage(fragment)
-
-// #extension GL_EXT_debug_printf : enable
 
 layout(location = 0) in vec4 vPosition;
 layout(location = 1) in vec4 vNormal;
@@ -40,13 +41,6 @@ layout(set = 2, binding = 0) uniform CameraUniforms {
     mat4 proj;
 } uCamera;
 
-// layout(set = 2, binding = 0) uniform MaterialUniforms {
-//     vec4 baseColor;
-//     float metallic;
-//     float roughness;
-//     float ambientOcclusion;
-//     float emissive;
-// } uMaterial;
 layout(location = 0) out vec4 fragColor;
 
 void main() {

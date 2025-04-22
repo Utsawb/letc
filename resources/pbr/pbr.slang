@@ -1,4 +1,6 @@
 // pbr.slang
+// slangc pbr.slang -target spirv -entry vs -o pbr.vert.spirv
+// slangc pbr.slang -target spirv -entry fs -o pbr.frag.spirv
 
 struct S_Global
 {
@@ -26,31 +28,31 @@ struct S_Model
     float4 attributeFlags2;
 };
 
-struct Frame
+struct S_Frame
 {
-    ConstantBuffer<S_Global> globals;
-    StructuredBuffer<S_Light> lights;
+    ConstantBuffer<S_Global> globals; // set 0, binding 0
+    StructuredBuffer<S_Light> lights; // set 0, binding 1
 };
-ParameterBlock<Frame> frame;
+ParameterBlock<S_Frame> frame;
 
-struct Draw
+struct S_Draw
 {
-    StructuredBuffer<S_Model> models;
+    StructuredBuffer<S_Model> models; // set 1, binding 0
 };
-ParameterBlock<Draw> draw;
+ParameterBlock<S_Draw> draw;
 
-struct View
+struct S_View
 {
-    ConstantBuffer<S_Camera> cameras;
+    ConstantBuffer<S_Camera> cameras; // set 2, binding 0
 };
-ParameterBlock<View> view;
+ParameterBlock<S_View> view;
 
 struct A2V
 {
-    float4 aPosition;
-    float4 aNormal;
-    float4 aTangent;
-    float2 aTexCoord;
+    float4 aPosition; // location = 0
+    float4 aNormal;   // location = 1
+    float4 aTangent;  // location = 2
+    float2 aTexCoord; // location = 3
 };
 
 struct V2F
@@ -60,7 +62,7 @@ struct V2F
     float4 vTangent;
     float2 vTexCoord;
 
-    float4 cPosition : SV_Position;
+    float4 cPosition : SV_Position; // gl_Position
 };
 
 [shader("vertex")]
@@ -68,8 +70,6 @@ V2F vs(uniform uint modelIdx, A2V a2v)
 {
     V2F v2f;
     var model = draw.models[modelIdx];
-
-    var funnyLightShit = frame.lights[0].position.x;
 
     float4 wPosition = mul(model.model, a2v.aPosition);
     float4 wNormal   = mul(model.modelInvTranspose, a2v.aNormal);
