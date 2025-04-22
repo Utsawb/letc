@@ -248,18 +248,18 @@ struct App
         if (eventStatus.rightTriggerPressed && (now - lastTriggerPressTime[1] >= BUTTON_DEBOUNCE_TIME))
         {
             frenetFrames->frames.push_back(eventStatus.rightHand);
+            curves = std::make_unique<letc::Curves>(frenetFrames->frames);
+            points->points.clear();
+            const float &length = curves->totalLength;
+            for (std::size_t i = 0; i < points->capacity; ++i)
+            {
+                points->points.push_back(curves->getInterp((float)i / (float)points->capacity * length)[3]);
+            }
+
             lastTriggerPressTime[1] = now;
         }
         if (eventStatus.a && (now - lastButtonPressTime[0] >= BUTTON_DEBOUNCE_TIME))
         {
-            curves = std::make_unique<letc::Curves>(frenetFrames->frames);
-
-            points->points.clear();
-            for (std::size_t i = 0; i < points->capacity; ++i)
-            {
-                points->points.push_back(curves->getInterp((float)i / (float)points->capacity)[3]);
-            }
-
             lastButtonPressTime[0] = now;
         }
         if (eventStatus.b && (now - lastButtonPressTime[1] >= BUTTON_DEBOUNCE_TIME))
