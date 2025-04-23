@@ -1,0 +1,32 @@
+[
+{
+  "directory": "/home/utsawb/letc/build/_deps/tinygltf-build",
+  "command": "/usr/bin/c++   -std=c++11 -o CMakeFiles/loader_example.dir/loader_example.cc.o -c /home/utsawb/letc/build/_deps/tinygltf-src/loader_example.cc",
+  "file": "/home/utsawb/letc/build/_deps/tinygltf-src/loader_example.cc",
+  "output": "_deps/tinygltf-build/CMakeFiles/loader_example.dir/loader_example.cc.o"
+},
+{
+  "directory": "/home/utsawb/letc/build/letc",
+  "command": "/usr/bin/c++  -I/home/utsawb/letc/letc -I/home/utsawb/letc/build/_deps/vkfw-src/include -I/ -std=gnu++26 -o CMakeFiles/letc.dir/core/device.cc.o -c /home/utsawb/letc/letc/core/device.cc",
+  "file": "/home/utsawb/letc/letc/core/device.cc",
+  "output": "letc/CMakeFiles/letc.dir/core/device.cc.o"
+},
+{
+  "directory": "/home/utsawb/letc/build/letc",
+  "command": "/usr/bin/c++  -I/home/utsawb/letc/letc -I/home/utsawb/letc/build/_deps/vkfw-src/include -I/ -std=gnu++26 -o CMakeFiles/letc.dir/core/instance.cc.o -c /home/utsawb/letc/letc/core/instance.cc",
+  "file": "/home/utsawb/letc/letc/core/instance.cc",
+  "output": "letc/CMakeFiles/letc.dir/core/instance.cc.o"
+},
+{
+  "directory": "/home/utsawb/letc/build/letc",
+  "command": "/usr/bin/c++  -I/home/utsawb/letc/letc -I/home/utsawb/letc/build/_deps/vkfw-src/include -I/ -std=gnu++26 -o CMakeFiles/letc.dir/core/window.cc.o -c /home/utsawb/letc/letc/core/window.cc",
+  "file": "/home/utsawb/letc/letc/core/window.cc",
+  "output": "letc/CMakeFiles/letc.dir/core/window.cc.o"
+},
+{
+  "directory": "/home/utsawb/letc/build/tests/basic_setup",
+  "command": "/usr/bin/c++  -I/home/utsawb/letc/letc -I/home/utsawb/letc/build/_deps/vkfw-src/include -I/ -std=gnu++26 -o CMakeFiles/basic_setup.dir/basic_setup.cc.o -c /home/utsawb/letc/tests/basic_setup/basic_setup.cc",
+  "file": "/home/utsawb/letc/tests/basic_setup/basic_setup.cc",
+  "output": "tests/basic_setup/CMakeFiles/basic_setup.dir/basic_setup.cc.o"
+}
+]
