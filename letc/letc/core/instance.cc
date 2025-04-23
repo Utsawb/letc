@@ -1,5 +1,10 @@
 #include "instance.hh"
 
+VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
+
+#define VMA_IMPLEMENTATION
+#include "vk_mem_alloc.h"
+
 namespace letc
 {
     InstanceBuilder::InstanceBuilder()
@@ -49,6 +54,8 @@ namespace letc
 
     auto InstanceBuilder::build() -> std::shared_ptr<Instance>
     {
+        VULKAN_HPP_DEFAULT_DISPATCHER.init();
+
         std::span<const char *> windowExtensions = vkfw::getRequiredInstanceExtensions();
 
         vk::InstanceCreateInfo instanceInfo{};
@@ -61,6 +68,8 @@ namespace letc
         auto instance = std::make_shared<Instance>();
         instance->m_instanceBuilder = *this;
         instance->m_handle = vk::createInstance(instanceInfo);
+
+        VULKAN_HPP_DEFAULT_DISPATCHER.init(instance->m_handle);
 
         return instance;
     }
