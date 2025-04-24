@@ -1,7 +1,14 @@
 #include "letc/letc.hh"
 
+std::filesystem::path resourcePath = "../resources";
+
 auto main(int argc, char *argv[]) -> int
 {
+    if (argc > 1)
+    {
+        resourcePath = argv[1];
+    }
+
     auto window = letc::WindowBuilder{}.build();
     auto instance = letc::InstanceBuilder{}.addExtension(vk::KHRSurfaceExtensionName).build();
     auto device = letc::DeviceBuilder{}
@@ -15,6 +22,12 @@ auto main(int argc, char *argv[]) -> int
     auto graphicsQueue = device->getQueue("graphics");
     auto computeQueues = device->getQueue("compute");
     auto swapchain = letc::SwapchainBuilder{}.build(window, instance, device);
+
+    // ok what is the differentiation between a resource and an asset
+    // obv an asset is something you read in from disk
+    // uhh but like what abt resource
+    // the code for a shader would be an asset, but the shader itself
+    // would be a resource?
 
     return 0;
 }

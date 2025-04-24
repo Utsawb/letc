@@ -24,26 +24,23 @@ namespace letc
     auto SwapchainBuilder::build(std::weak_ptr<Window> window, std::weak_ptr<Instance> instance,
                                  std::weak_ptr<Device> device) -> std::shared_ptr<Swapchain>
     {
-        auto swapchain = std::make_shared<Swapchain>();
-        swapchain->m_instance = instance;
-        swapchain->m_device = device;
-        swapchain->m_surface = window.lock()->createSurface(instance);
-        swapchain->m_surfaceCapabilites = device.lock()->getPhysical().getSurfaceCapabilitiesKHR(swapchain->m_surface);
+        auto surface = window.lock()->createSurface(instance);
+        auto surfaceCapabilites = device.lock()->getPhysical().getSurfaceCapabilitiesKHR(surface);
 
         auto swapchainInfo = vk::SwapchainCreateInfoKHR{}
                                  .setPresentMode(m_presentMode)
                                  .setClipped(true)
-                                 .setSurface(swapchain->m_surface)
+                                 .setSurface(surface)
                                  .setImageFormat(m_format.format)
                                  .setImageColorSpace(m_format.colorSpace)
-                                 .setMinImageCount(swapchain->m_surfaceCapabilites.minImageCount + 1)
+                                 .setMinImageCount(surfaceCapabilites.minImageCount + 1)
                                  .setImageArrayLayers(1)
                                  .setImageUsage(vk::ImageUsageFlagBits::eColorAttachment)
                                  .setImageSharingMode(vk::SharingMode::eExclusive)
-                                 .setPreTransform(swapchain->m_surfaceCapabilites.currentTransform)
+                                 .setPreTransform(surfaceCapabilites.currentTransform)
                                  .setCompositeAlpha(vk::CompositeAlphaFlagBitsKHR::eOpaque);
 
-        if (swapchain->m_surfaceCapabilites.currentExtent ==
+        if (surfaceCapabilites.currentExtent ==
             vk::Extent2D{std::numeric_limits<uint32_t>::max(), std::numeric_limits<uint32_t>::max()})
         {
             swapchainInfo.setImageExtent(vk::Extent2D{static_cast<uint32_t>(window.lock()->get().getWidth()),
@@ -51,16 +48,47 @@ namespace letc
         }
         else
         {
-            swapchainInfo.setImageExtent(swapchain->m_surfaceCapabilites.currentExtent);
+            swapchainInfo.setImageExtent(surfaceCapabilites.currentExtent);
         }
 
-        swapchain->m_handle = device.lock()->getLogical().createSwapchainKHR(swapchainInfo);
+        auto handle = device.lock()->getLogical().createSwapchainKHR(swapchainInfo);
+        auto images = device.lock()->getLogical().getSwapchainImagesKHR(handle);
+        auto views = std::vector<vk::ImageView>{};
+        views.reserve(images.size());
+        std::ranges::for_each(images, [this, &views, &device](const vk::Image &img) {
+            auto imgInfo = vk::ImageViewCreateInfo{}
+                               .setImage(img)
+                               .setViewType(vk::ImageViewType::e2D)
+                               .setFormat(m_format.format)
+                               .setSubresourceRange(vk::ImageSubresourceRange{}
+                                                        .setAspectMask(vk::ImageAspectFlagBits::eColor)
+                                                        .setBaseMipLevel(0)
+                                                        .setLevelCount(1)
+                                                        .setBaseArrayLayer(0)
+                                                        .setLayerCount(1));
+            views.push_back(device.lock()->getLogical().createImageView(imgInfo));
+        });
 
+        auto swapchain = std::make_shared<Swapchain>();
+        swapchain->m_instance = instance;
+        swapchain->m_device = device;
+        swapchain->m_format = m_format;
+        swapchain->m_presentMode = m_presentMode;
+        swapchain->m_surface = surface;
+        swapchain->m_surfaceCapabilites = surfaceCapabilites;
+        swapchain->m_handle = handle;
+        swapchain->m_images = images;
+        swapchain->m_views = views;
         return swapchain;
     }
 
     Swapchain::~Swapchain()
     {
+        for (const auto &view : m_views)
+        {
+            m_device.lock()->getLogical().destroyImageView(view);
+        }
+
         m_device.lock()->getLogical().destroySwapchainKHR(m_handle);
         m_instance.lock()->get().destroySurfaceKHR(m_surface);
     }

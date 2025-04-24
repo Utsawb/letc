@@ -26,5 +26,5 @@ target_include_directories(letc
     PUBLIC
         ${GLM_INCLUDE_DIRS}
         ${vkfw_SOURCE_DIR}/include
-        ${tinyglft_SOURCE_DIR}/
+        ${tinygltf_SOURCE_DIR}/
 )

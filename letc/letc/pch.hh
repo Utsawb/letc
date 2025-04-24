@@ -1,5 +1,7 @@
 #pragma once
 
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -21,6 +23,8 @@
 #include <vkfw/vkfw.hpp>
 
 #include <vk_mem_alloc.h>
+
+#include <tiny_gltf.h>
 
 #define ATHROW(condition, msg)                                                                                         \
     if (!(condition))                                                                                                  \

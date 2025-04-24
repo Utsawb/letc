@@ -77,6 +77,21 @@ else()
     message(STATUS "Found VulkanMemoryAllocator: ${VulkanMemoryAllocator_VERSION}")
 endif()
 
+find_package(Slang QUIET)
+if (NOT Slang_FOUND)
+    message(STATUS "Slang not found system-wide, Fetching from source...")
+    FetchContent_Declare(
+        Slang
+        GIT_REPOSITORY https://github.com/shader-slang/slang.git
+        GIT_TAG v2025.7
+        OVERRIDE_FIND_PACKAGE
+    )
+    FetchContent_MakeAvailable(Slang)
+    find_package(Slang REQUIRED)
+else()
+    find_package(Slang)
+endif()
+
 add_subdirectory(letc)
 
 file(GLOB TESTBED_DIRS LIST_DIRECTORIES true "tests/*")

@@ -35,7 +35,7 @@ namespace letc
 
         std::weak_ptr<Instance> m_instance;
         std::weak_ptr<Device> m_device;
-        vk::Format m_format;
+        vk::SurfaceFormatKHR m_format;
         vk::PresentModeKHR m_presentMode;
         vk::SurfaceKHR m_surface;
         vk::SurfaceCapabilitiesKHR m_surfaceCapabilites;
