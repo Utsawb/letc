@@ -1,4 +1,5 @@
 #include "window.hh"
+#include <vulkan/vulkan_handles.hpp>
 
 namespace letc
 {
@@ -44,6 +45,11 @@ namespace letc
     auto Window::get() -> vkfw::Window
     {
         return m_handle;
+    }
+
+    auto Window::createSurface(std::weak_ptr<Instance> instance) -> vk::SurfaceKHR
+    {
+        return vkfw::createWindowSurface(instance.lock()->get(), m_handle);
     }
 
 } // namespace letc

@@ -63,6 +63,7 @@ namespace letc
         std::vector<const char *> charExt;
         charExt.reserve(m_extensions.size());
         std::ranges::for_each(m_extensions, [&charExt](const auto &s) { charExt.push_back(s.c_str()); });
+        std::ranges::for_each(windowExtensions, [&charExt](const auto &c) { charExt.push_back(c); });
         instanceInfo.setPEnabledExtensionNames(charExt);
 
         auto instance = std::make_shared<Instance>();

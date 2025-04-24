@@ -2,6 +2,8 @@
 
 #include "letc/pch.hh"
 
+#include "letc/core/instance.hh"
+
 namespace letc
 {
     class Window;
@@ -28,6 +30,7 @@ namespace letc
       public:
         ~Window();
         auto get() -> vkfw::Window;
+        auto createSurface(std::weak_ptr<Instance> instance) -> vk::SurfaceKHR;
 
       private:
         friend WindowBuilder;

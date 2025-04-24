@@ -14,6 +14,7 @@ auto main(int argc, char *argv[]) -> int
                       .build(instance);
     auto graphicsQueue = device->getQueue("graphics");
     auto computeQueues = device->getQueue("compute");
+    auto swapchain = letc::SwapchainBuilder{}.build(window, instance, device);
 
     return 0;
 }
