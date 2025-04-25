@@ -22,6 +22,8 @@ auto main(int argc, char *argv[]) -> int
     auto graphicsQueue = device->getQueue("graphics");
     auto computeQueues = device->getQueue("compute");
     auto swapchain = letc::SwapchainBuilder{}.build(window, instance, device);
+    auto shaderManager =
+        letc::ShaderManager{device}.add("../compile_commands.json", "main", vk::ShaderStageFlagBits::eAll);
 
     // ok what is the differentiation between a resource and an asset
     // obv an asset is something you read in from disk

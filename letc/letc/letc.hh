@@ -6,3 +6,4 @@
 #include "letc/core/instance.hh"
 #include "letc/core/window.hh"
 #include "letc/core/swapchain.hh"
+#include "letc/core/shaders.hh"

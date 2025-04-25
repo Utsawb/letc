@@ -77,20 +77,27 @@ else()
     message(STATUS "Found VulkanMemoryAllocator: ${VulkanMemoryAllocator_VERSION}")
 endif()
 
-find_package(Slang QUIET)
-if (NOT Slang_FOUND)
-    message(STATUS "Slang not found system-wide, Fetching from source...")
-    FetchContent_Declare(
-        Slang
-        GIT_REPOSITORY https://github.com/shader-slang/slang.git
-        GIT_TAG v2025.7
-        OVERRIDE_FIND_PACKAGE
-    )
-    FetchContent_MakeAvailable(Slang)
-    find_package(Slang REQUIRED)
-else()
-    find_package(Slang)
-endif()
+# set(SLANG_ENABLE_CUDA FALSE)
+# set(SLANG_ENABLE_OPTIX FALSE)
+# set(SLANG_ENABLE_TESTS FALSE)
+# set(SLANG_ENABLE_EXAMPLES FALSE)
+# find_package(Slang QUIET)
+# if (NOT Slang_FOUND)
+#     message(STATUS "Slang not found system-wide, Fetching from source...")
+#     FetchContent_Declare(
+#         Slang
+#         GIT_REPOSITORY https://github.com/shader-slang/slang.git
+#         GIT_TAG v2025.7
+#         OVERRIDE_FIND_PACKAGE
+#     )
+#     FetchContent_MakeAvailable(Slang)
+#     find_package(Slang REQUIRED)
+# else()
+#     find_package(Slang)
+# endif()
+
+include_directories("/opt/shader-slang-bin/include/")
+link_libraries("/opt/shader-slang-bin/lib/libslang.so")
 
 add_subdirectory(letc)
 
