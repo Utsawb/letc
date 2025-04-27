@@ -28,9 +28,10 @@
 
 #include <tiny_gltf.h>
 
-#include <shader-slang/slang.h>
-#include <shader-slang/slang-com-ptr.h>
-#include <shader-slang/slang-com-helper.h>
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
+
+#include <spirv_cross/spirv_cross.hpp>
 
 #define ATHROW(condition, msg)                                                                                         \
     if (!(condition))                                                                                                  \
@@ -40,7 +41,7 @@
 
 namespace letc
 {
-    inline auto readFile(const std::filesystem::path &path) -> std::vector<char>
+    inline auto readFile(const std::filesystem::path &path) -> std::vector<uint32_t>
     {
         std::ifstream fileStream(path, std::ios::binary);
         ATHROW(fileStream, std::format("failed to open file {}", path.c_str()));
@@ -49,9 +50,9 @@ namespace letc
         std::streampos fileSize = fileStream.tellg();
         ATHROW(fileSize > 0, "Failed to determine file size: " + path.string());
 
-        std::vector<char> buffer(static_cast<size_t>(fileSize));
+        std::vector<uint32_t> buffer(static_cast<size_t>(fileSize / sizeof(uint32_t)));
         fileStream.seekg(0, std::ios::beg);
-        fileStream.read(buffer.data(), fileSize);
+        fileStream.read(reinterpret_cast<char *>(buffer.data()), fileSize);
 
         return buffer;
     }

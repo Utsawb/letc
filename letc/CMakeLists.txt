@@ -20,11 +20,12 @@ target_link_libraries(letc
         Vulkan::Vulkan
         GPUOpen::VulkanMemoryAllocator
         tinygltf
+        spirv-cross-core
 )
 
 target_include_directories(letc
     PUBLIC
         ${GLM_INCLUDE_DIRS}
         ${vkfw_SOURCE_DIR}/include
-        ${tinygltf_SOURCE_DIR}/
+        ${tinygltf_SOURCE_DIR}
 )

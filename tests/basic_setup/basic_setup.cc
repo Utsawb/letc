@@ -23,13 +23,12 @@ auto main(int argc, char *argv[]) -> int
     auto computeQueues = device->getQueue("compute");
     auto swapchain = letc::SwapchainBuilder{}.build(window, instance, device);
     auto shaderManager =
-        letc::ShaderManager{device}.add("../compile_commands.json", "main", vk::ShaderStageFlagBits::eAll);
+        letc::ShaderManager{device}
+            .add(resourcePath / "shaders" / "pbr" / "vert.spirv", "main", vk::ShaderStageFlagBits::eAll)
+            .add(resourcePath / "shaders" / "pbr" / "frag.spirv", "main", vk::ShaderStageFlagBits::eAll);
+    auto pbrVert = shaderManager.getShader(resourcePath / "shaders" / "pbr" / "vert.spirv", "main");
+    auto pbrFrag = shaderManager.getShader(resourcePath / "shaders" / "pbr" / "frag.spirv", "main");
 
-    // ok what is the differentiation between a resource and an asset
-    // obv an asset is something you read in from disk
-    // uhh but like what abt resource
-    // the code for a shader would be an asset, but the shader itself
-    // would be a resource?
 
     return 0;
 }

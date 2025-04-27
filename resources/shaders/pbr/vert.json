@@ -1,0 +1,190 @@
+{
+    "entryPoints" : [
+        {
+            "name" : "main",
+            "mode" : "vert"
+        }
+    ],
+    "types" : {
+        "_12" : {
+            "name" : "UModel",
+            "members" : [
+                {
+                    "name" : "model",
+                    "type" : "mat4",
+                    "offset" : 0,
+                    "matrix_stride" : 16
+                },
+                {
+                    "name" : "model_inv_t",
+                    "type" : "mat4",
+                    "offset" : 64,
+                    "matrix_stride" : 16
+                }
+            ]
+        },
+        "_33" : {
+            "name" : "gl_PerVertex",
+            "members" : [
+                {
+                    "name" : "gl_Position",
+                    "type" : "vec4"
+                },
+                {
+                    "name" : "gl_PointSize",
+                    "type" : "float"
+                },
+                {
+                    "name" : "gl_ClipDistance",
+                    "type" : "float",
+                    "array" : [
+                        1
+                    ],
+                    "array_size_is_literal" : [
+                        true
+                    ]
+                },
+                {
+                    "name" : "gl_CullDistance",
+                    "type" : "float",
+                    "array" : [
+                        1
+                    ],
+                    "array_size_is_literal" : [
+                        true
+                    ]
+                }
+            ]
+        },
+        "_36" : {
+            "name" : "UCamera",
+            "members" : [
+                {
+                    "name" : "proj",
+                    "type" : "mat4",
+                    "offset" : 0,
+                    "matrix_stride" : 16
+                },
+                {
+                    "name" : "view",
+                    "type" : "mat4",
+                    "offset" : 64,
+                    "matrix_stride" : 16
+                }
+            ]
+        },
+        "_52" : {
+            "name" : "UFrameData",
+            "members" : [
+                {
+                    "name" : "time",
+                    "type" : "float",
+                    "offset" : 0
+                },
+                {
+                    "name" : "frame",
+                    "type" : "float",
+                    "offset" : 4
+                }
+            ]
+        },
+        "_55" : {
+            "name" : "SLight",
+            "members" : [
+                {
+                    "name" : "position",
+                    "type" : "vec4",
+                    "offset" : 0
+                },
+                {
+                    "name" : "color",
+                    "type" : "vec4",
+                    "offset" : 16
+                }
+            ]
+        },
+        "_57" : {
+            "name" : "BLights",
+            "members" : [
+                {
+                    "name" : "lights",
+                    "type" : "_55",
+                    "array" : [
+                        0
+                    ],
+                    "array_size_is_literal" : [
+                        true
+                    ],
+                    "offset" : 0,
+                    "array_stride" : 32
+                }
+            ]
+        }
+    },
+    "inputs" : [
+        {
+            "type" : "vec4",
+            "name" : "aPosition",
+            "location" : 0
+        },
+        {
+            "type" : "vec4",
+            "name" : "aNormal",
+            "location" : 1
+        },
+        {
+            "type" : "vec4",
+            "name" : "aTangent",
+            "location" : 2
+        },
+        {
+            "type" : "vec2",
+            "name" : "aTexCoord",
+            "location" : 3
+        }
+    ],
+    "outputs" : [
+        {
+            "type" : "vec4",
+            "name" : "vPosition",
+            "location" : 0
+        },
+        {
+            "type" : "vec4",
+            "name" : "vNormal",
+            "location" : 1
+        }
+    ],
+    "ssbos" : [
+        {
+            "type" : "_57",
+            "name" : "BLights",
+            "block_size" : 0,
+            "set" : 0,
+            "binding" : 2
+        }
+    ],
+    "ubos" : [
+        {
+            "type" : "_12",
+            "name" : "UModel",
+            "block_size" : 128,
+            "set" : 1,
+            "binding" : 0
+        },
+        {
+            "type" : "_36",
+            "name" : "UCamera",
+            "block_size" : 128,
+            "set" : 0,
+            "binding" : 1
+        },
+        {
+            "type" : "_52",
+            "name" : "UFrameData",
+            "block_size" : 8,
+            "set" : 0,
+            "binding" : 0
+        }
+    ]
+}
