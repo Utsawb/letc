@@ -22,13 +22,11 @@ auto main(int argc, char *argv[]) -> int
     auto graphicsQueue = device->getQueue("graphics");
     auto computeQueues = device->getQueue("compute");
     auto swapchain = letc::SwapchainBuilder{}.build(window, instance, device);
-    auto shaderManager =
-        letc::ShaderManager{device}
-            .add(resourcePath / "shaders" / "pbr" / "vert.spirv", "main", vk::ShaderStageFlagBits::eAll)
-            .add(resourcePath / "shaders" / "pbr" / "frag.spirv", "main", vk::ShaderStageFlagBits::eAll);
+    auto shaderManager = std::move(letc::ShaderManager{device}
+                                       .add(resourcePath / "shaders" / "pbr" / "vert.spirv", "main")
+                                       .add(resourcePath / "shaders" / "pbr" / "frag.spirv", "main"));
     auto pbrVert = shaderManager.getShader(resourcePath / "shaders" / "pbr" / "vert.spirv", "main");
     auto pbrFrag = shaderManager.getShader(resourcePath / "shaders" / "pbr" / "frag.spirv", "main");
-
 
     return 0;
 }
