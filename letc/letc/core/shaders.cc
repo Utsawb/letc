@@ -2,6 +2,16 @@
 
 namespace letc
 {
+    auto Shader::get() -> vk::ShaderModule
+    {
+        return m_module;
+    }
+
+    auto Shader::getLayouts() -> std::map<uint32_t, std::shared_ptr<DescriptorSetLayout>>
+    {
+        return m_layouts;
+    }
+
     ShaderManager::ShaderManager(std::weak_ptr<Device> device)
     {
         m_device = device;
@@ -88,5 +98,4 @@ namespace letc
     {
         return m_shaders.at({path, entry});
     }
-
 } // namespace letc

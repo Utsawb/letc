@@ -29,6 +29,7 @@ namespace letc
     {
       public:
         ~Swapchain();
+        auto getFormat() const -> vk::SurfaceFormatKHR;
 
       private:
         friend SwapchainBuilder;

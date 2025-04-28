@@ -31,6 +31,7 @@ namespace letc
       public:
         ~DescriptorSetLayout();
         auto get() -> vk::DescriptorSetLayout;
+        auto getInfo() -> std::map<std::string, vk::DescriptorSetLayoutBinding>;
 
       private:
         friend DescriptorSetLayoutBuilder;

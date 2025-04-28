@@ -52,4 +52,9 @@ namespace letc
         return m_handle;
     }
 
+    auto DescriptorSetLayout::getInfo() -> std::map<std::string, vk::DescriptorSetLayoutBinding>
+    {
+        return m_names;
+    }
+
 } // namespace letc

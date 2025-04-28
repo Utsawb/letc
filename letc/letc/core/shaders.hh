@@ -73,11 +73,17 @@ namespace std
 namespace letc
 {
     class ShaderManager;
+    class GraphicsPipelineBuilder;
 
     class Shader
     {
+      public:
+        auto get() -> vk::ShaderModule;
+        auto getLayouts() -> std::map<uint32_t, std::shared_ptr<DescriptorSetLayout>>;
+
       private:
         friend ShaderManager;
+        friend GraphicsPipelineBuilder;
 
         std::string m_entry;
         vk::ShaderStageFlagBits m_stage;

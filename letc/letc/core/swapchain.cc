@@ -93,4 +93,9 @@ namespace letc
         m_instance.lock()->get().destroySurfaceKHR(m_surface);
     }
 
+    auto Swapchain::getFormat() const -> vk::SurfaceFormatKHR
+    {
+        return m_format;
+    }
+
 } // namespace letc

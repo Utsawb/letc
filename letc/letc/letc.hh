@@ -9,3 +9,4 @@
 #include "letc/core/swapchain.hh"
 #include "letc/core/window.hh"
 #include "letc/core/descriptor.hh"
+#include "letc/core/pipeline.hh"
