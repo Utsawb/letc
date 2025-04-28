@@ -23,6 +23,19 @@ auto main(int argc, char *argv[]) -> int
     auto computeQueues = device->getQueue("compute");
     auto swapchain = letc::SwapchainBuilder{}.build(window, instance, device);
     auto format = swapchain->getFormat().format;
+
+    auto frameSetLayout =
+        letc::DescriptorSetLayoutBuilder{}
+            .addBinding("frame", 0, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eAllGraphics)
+            .addBinding("camera", 1, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eAllGraphics)
+            .addBinding("lights", 2, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eAllGraphics)
+            .build(device);
+
+    auto modelSetLayout =
+        letc::DescriptorSetLayoutBuilder{}
+            .addBinding("model", 0, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eAllGraphics)
+            .build(device);
+
     auto shaderManager = std::move(letc::ShaderManager{device}
                                        .add(resourcePath / "shaders" / "pbr" / "vert.spirv", "main")
                                        .add(resourcePath / "shaders" / "pbr" / "frag.spirv", "main"));
