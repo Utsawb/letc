@@ -171,10 +171,10 @@ namespace letc
 
         std::vector<vk::PipelineShaderStageCreateInfo> shaderStageInfos;
         shaderStageInfos.reserve(m_shaders.size());
-        std::map<uint32_t, std::shared_ptr<DescriptorSetLayout>> combinedLayouts; // set -> layout
+
+        std::map<uint32_t, DescriptorSetLayout> combinedDescriptorSetLayouts;
         std::vector<vk::PushConstantRange> combinedPushConstants;
 
-        // --- Shader Processing (Unchanged) ---
         for (const auto &shader : m_shaders)
         {
             shaderStageInfos.push_back(vk::PipelineShaderStageCreateInfo{}
@@ -182,18 +182,16 @@ namespace letc
                                            .setModule(shader.m_module)
                                            .setPName(shader.m_entry.c_str()));
 
-            for (const auto &[setIndex, layout] : shader.m_layouts)
-            {
-                combinedLayouts[setIndex] = layout;
-            }
-
-            combinedPushConstants.insert(combinedPushConstants.end(), shader.m_push.begin(), shader.m_push.end());
+            combinedDescriptorSetLayouts = combinedDescriptorSetLayouts | shader.m_layouts;
+            combinedPushConstants = combinedPushConstants | shader.m_push;
         }
 
         std::vector<vk::DescriptorSetLayout> setLayouts;
-        for (const auto &[setIndex, layoutPtr] : combinedLayouts)
+        std::vector<vk::UniqueDescriptorSetLayout> uniqueSetLayouts;
+        for (const auto &[set, layout] : combinedDescriptorSetLayouts)
         {
-            setLayouts.push_back(layoutPtr->get());
+            uniqueSetLayouts.push_back(layout.build(device));
+            setLayouts.push_back(uniqueSetLayouts.back().get());
         }
 
         vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};

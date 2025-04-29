@@ -196,6 +196,8 @@ namespace letc
             device->m_queues.emplace(assignment.id, std::move(queueInfo)); // Use emplace and move
         }
 
+        VULKAN_HPP_DEFAULT_DISPATCHER.init(device->m_logicalDevice);
+
         return device;
     }
 

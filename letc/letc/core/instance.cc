@@ -2,9 +2,6 @@
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
-#define VMA_IMPLEMENTATION
-#include "vk_mem_alloc.h"
-
 namespace letc
 {
     InstanceBuilder::InstanceBuilder()
@@ -83,5 +80,10 @@ namespace letc
     auto Instance::get() -> vk::Instance
     {
         return m_handle;
+    }
+
+    auto Instance::getApiVer() -> uint32_t
+    {
+        return m_instanceBuilder.m_apiVer;
     }
 } // namespace letc

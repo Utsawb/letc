@@ -79,7 +79,7 @@ namespace letc
     {
       public:
         auto get() -> vk::ShaderModule;
-        auto getLayouts() -> std::map<uint32_t, std::shared_ptr<DescriptorSetLayout>>;
+        auto getLayouts() -> std::map<uint32_t, DescriptorSetLayout>;
 
       private:
         friend ShaderManager;
@@ -87,7 +87,7 @@ namespace letc
 
         std::string m_entry;
         vk::ShaderStageFlagBits m_stage;
-        std::map<uint32_t, std::shared_ptr<DescriptorSetLayout>> m_layouts;
+        std::map<uint32_t, DescriptorSetLayout> m_layouts;
         std::vector<vk::PushConstantRange> m_push;
         vk::ShaderModule m_module;
     };
@@ -113,3 +113,45 @@ namespace letc
     };
 
 } // namespace letc
+
+/**
+ * @brief Merges two vectors of push constant ranges.
+ *
+ * Combines push constant ranges from two vectors. If ranges with the same
+ * offset and size exist in both vectors, their stage flags are merged using
+ * bitwise OR. Otherwise, unique ranges from the right-hand side are appended.
+ *
+ * @param lhs The left-hand side vector of push constant ranges.
+ * @param rhs The right-hand side vector of push constant ranges.
+ * @return A new vector containing the merged push constant ranges.
+ */
+inline auto operator|(const std::vector<vk::PushConstantRange> &lhs, const std::vector<vk::PushConstantRange> &rhs)
+    -> std::vector<vk::PushConstantRange>
+{
+    // Create a copy of the left-hand side vector to store the result.
+    auto merged_ranges = lhs; //
+
+    // Iterate through each push constant range in the right-hand side vector.
+    for (const auto &rhs_range : rhs) //
+    {
+        // Try to find a range in the merged vector with the same offset and size.
+        auto found_it = std::ranges::find_if(merged_ranges, [&rhs_range](const vk::PushConstantRange &existing_range) {
+            return existing_range.offset == rhs_range.offset && existing_range.size == rhs_range.size; //
+        });
+
+        // If a matching range is found...
+        if (found_it != merged_ranges.end())
+        {
+            // Merge the stage flags using bitwise OR.
+            found_it->stageFlags |= rhs_range.stageFlags;
+        }
+        else // If no matching range is found...
+        {
+            // Add the range from the right-hand side vector to the merged vector.
+            merged_ranges.push_back(rhs_range); //
+        }
+    }
+
+    // Return the vector containing the merged ranges.
+    return merged_ranges;
+}

@@ -7,7 +7,7 @@ namespace letc
         return m_module;
     }
 
-    auto Shader::getLayouts() -> std::map<uint32_t, std::shared_ptr<DescriptorSetLayout>>
+    auto Shader::getLayouts() -> std::map<uint32_t, DescriptorSetLayout>
     {
         return m_layouts;
     }
@@ -43,14 +43,14 @@ namespace letc
         auto stages = spv2vk(found->execution_model);
         ATHROW(found != ep.end(), std::format("entry point {} not found", entry));
 
-        std::map<uint32_t, DescriptorSetLayoutBuilder> dslb;
-        auto populateResource = [&compiler, &resources, &stages, &dslb](const spirv_cross::Resource &r,
-                                                                        const vk::DescriptorType &type) {
+        std::map<uint32_t, DescriptorSetLayout> dsl;
+        auto populateResource = [&compiler, &resources, &stages, &dsl](const spirv_cross::Resource &r,
+                                                                       const vk::DescriptorType &type) {
             const auto &set = compiler.get_decoration(r.id, spv::DecorationDescriptorSet);
             const auto &binding = compiler.get_decoration(r.id, spv::DecorationBinding);
             const auto &count = 1;
 
-            dslb[set].addBinding(r.name, binding, type, stages, count);
+            dsl[set].addBinding(r.name, binding, type, stages, count);
         };
 
         for (const auto &r : resources.uniform_buffers)
@@ -82,10 +82,7 @@ namespace letc
         auto shaderModuleInfo = vk::ShaderModuleCreateInfo{}.setCode(code.first->second);
         shader.m_entry = entry;
         shader.m_stage = stages;
-        for (const auto &[set, dslb] : dslb)
-        {
-            shader.m_layouts[set] = dslb.build(m_device);
-        }
+        shader.m_layouts = dsl;
         shader.m_push = pcrs;
         shader.m_module = m_device.lock()->getLogical().createShaderModule(shaderModuleInfo);
 

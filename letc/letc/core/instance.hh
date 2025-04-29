@@ -21,6 +21,8 @@ namespace letc
         auto build() -> std::shared_ptr<Instance>;
 
       private:
+        friend Instance;
+
         std::string m_appName;
         uint32_t m_appVer;
         std::string m_engineName;
@@ -34,6 +36,7 @@ namespace letc
       public:
         ~Instance();
         auto get() -> vk::Instance;
+        auto getApiVer() -> uint32_t;
 
       private:
         friend InstanceBuilder;
