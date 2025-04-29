@@ -66,15 +66,13 @@ namespace letc
         for (const auto &dl : m_descriptors)
         {
             auto dslb = vk::DescriptorSetLayoutBinding{}
+                            .setImmutableSamplers(dl.m_samplers)
                             .setBinding(dl.m_binding)
                             .setDescriptorType(dl.m_type)
                             .setStageFlags(dl.m_stages)
-                            .setDescriptorCount(dl.m_count)
-                            .setImmutableSamplers(dl.m_samplers);
+                            .setDescriptorCount(dl.m_count);
+            dslb.descriptorCount = dl.m_count;
             bindings.push_back(dslb);
-
-            std::cout << std::format("binding {}, type {}, count {}, name {}\n", dl.m_binding, vk::to_string(dl.m_type),
-                                     dl.m_count, dl.m_name);
         }
 
         auto dslInfo = vk::DescriptorSetLayoutCreateInfo{}.setBindings(bindings);
@@ -104,9 +102,6 @@ namespace letc
             desc.m_stages = dsl.m_stages;
             desc.m_binding = dsl.m_binding;
             desc.m_samplers = dsl.m_samplers;
-
-            std::cout << std::format("binding {}, type {}, count {}, name {}\n", dsl.m_binding,
-                                     vk::to_string(dsl.m_type), dsl.m_count, dsl.m_name);
 
             descriptorSet->m_descriptors.push_back(desc);
         }
@@ -141,9 +136,6 @@ namespace letc
 
         auto found =
             std::ranges::find_if(m_descriptors, [binding](const Descriptor &d) { return d.m_binding == binding; });
-
-        std::cerr << std::format("writing to: name {}, binding {},  type {}, count {}\n", found->m_name,
-                                 found->m_binding, vk::to_string(found->m_type), found->m_count);
 
         auto write = vk::WriteDescriptorSet{}
                          .setDstSet(m_handle)

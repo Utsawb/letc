@@ -48,22 +48,22 @@ auto main(int argc, char *argv[]) -> int
 
     auto frameSet = pbrSetsLayout.at(0).build(descPool);
     frameSet->attachBuffer(device, 0, frameBuffer.get(), sizeof(FrameData));
-    // auto modelSet = pbrSetsLayout.at(1).build(descPool);
+    auto modelSet = pbrSetsLayout.at(1).build(descPool);
 
-    // auto pbrPipeline =
-    //     letc::GraphicsPipelineBuilder{}
-    //         .addShader(pbrVert)
-    //         .addShader(pbrFrag)
-    //         .addVertexBinding(0, sizeof(glm::vec4), vk::VertexInputRate::eVertex)
-    //         .addVertexAttribute(0, 0, vk::Format::eR32G32B32A32Sfloat, 0)
-    //         .addVertexBinding(1, sizeof(glm::vec4), vk::VertexInputRate::eVertex)
-    //         .addVertexAttribute(1, 1, vk::Format::eR32G32B32A32Sfloat, 0)
-    //         .addVertexBinding(2, sizeof(glm::vec4), vk::VertexInputRate::eVertex)
-    //         .addVertexAttribute(2, 2, vk::Format::eR32G32B32A32Sfloat, 0)
-    //         .addVertexBinding(3, sizeof(glm::vec2), vk::VertexInputRate::eVertex)
-    //         .addVertexAttribute(3, 3, vk::Format::eR32G32Sfloat, 0)
-    //         .setRendering([format](vk::PipelineRenderingCreateInfo &prci) { prci.setColorAttachmentFormats(format); })
-    //         .build(device);
+    auto pbrPipeline =
+        letc::GraphicsPipelineBuilder{}
+            .addShader(pbrVert)
+            .addShader(pbrFrag)
+            .addVertexBinding(0, sizeof(glm::vec4), vk::VertexInputRate::eVertex)
+            .addVertexAttribute(0, 0, vk::Format::eR32G32B32A32Sfloat, 0)
+            .addVertexBinding(1, sizeof(glm::vec4), vk::VertexInputRate::eVertex)
+            .addVertexAttribute(1, 1, vk::Format::eR32G32B32A32Sfloat, 0)
+            .addVertexBinding(2, sizeof(glm::vec4), vk::VertexInputRate::eVertex)
+            .addVertexAttribute(2, 2, vk::Format::eR32G32B32A32Sfloat, 0)
+            .addVertexBinding(3, sizeof(glm::vec2), vk::VertexInputRate::eVertex)
+            .addVertexAttribute(3, 3, vk::Format::eR32G32Sfloat, 0)
+            .setRendering([format](vk::PipelineRenderingCreateInfo &prci) { prci.setColorAttachmentFormats(format); })
+            .build(device);
 
     auto commandPool = device->getLogical().createCommandPoolUnique(
         vk::CommandPoolCreateInfo{}.setQueueFamilyIndex(graphicsQueue.getFamily()));
