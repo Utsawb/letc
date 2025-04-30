@@ -108,6 +108,7 @@ namespace letc
 
         descriptorSet->m_handle = descriptorSetHandle;
         descriptorSet->m_layout = std::move(layoutHandle);
+        descriptorSet->m_device = pool.lock()->m_device;
 
         return descriptorSet;
     }
@@ -122,12 +123,36 @@ namespace letc
         return res;
     }
 
-    auto DescriptorSet::get() -> vk::DescriptorSet
+    auto DescriptorSet::get() -> vk::DescriptorSet &
     {
         return m_handle;
     }
-    auto DescriptorSet::attachBuffer(std::weak_ptr<Device> device, const uint32_t &binding, const vk::Buffer &buffer,
-                                     const vk::DeviceSize &range, const vk::DeviceSize &offset) -> DescriptorSet &
+
+    auto DescriptorSet::attachBuffer(const std::string &name, const vk::Buffer &buffer, const vk::DeviceSize &range,
+                                     const vk::DeviceSize &offset) -> DescriptorSet &
+    {
+        vk::DescriptorBufferInfo bufferInfo{};
+        bufferInfo.setBuffer(buffer);
+        bufferInfo.setRange(range);
+        bufferInfo.setOffset(offset);
+
+        auto found = std::ranges::find_if(m_descriptors, [name](const Descriptor &d) { return d.m_name == name; });
+        ATHROW(found != m_descriptors.end(), std::format("could not find {}", name));
+
+        auto write = vk::WriteDescriptorSet{}
+                         .setDstSet(m_handle)
+                         .setDstBinding(found->m_binding)
+                         .setDescriptorCount(1)
+                         .setDescriptorType(found->m_type)
+                         .setBufferInfo(bufferInfo);
+
+        m_device.lock()->getLogical().updateDescriptorSets(write, {});
+
+        return *this;
+    }
+
+    auto DescriptorSet::attachBuffer(const uint32_t &binding, const vk::Buffer &buffer, const vk::DeviceSize &range,
+                                     const vk::DeviceSize &offset) -> DescriptorSet &
     {
         vk::DescriptorBufferInfo bufferInfo{};
         bufferInfo.setBuffer(buffer);
@@ -144,18 +169,18 @@ namespace letc
                          .setDescriptorType(found->m_type)
                          .setBufferInfo(bufferInfo);
 
-        device.lock()->getLogical().updateDescriptorSets(write, {});
+        m_device.lock()->getLogical().updateDescriptorSets(write, {});
 
         return *this;
     }
-    auto DescriptorSet::attachImage(std::weak_ptr<Device> device, const uint32_t &binding, const vk::ImageView &view,
-                                    const vk::Sampler &sampler, const vk::ImageLayout layout) -> DescriptorSet &
+
+    auto DescriptorSet::attachImage(const uint32_t &binding, const vk::ImageView &view, const vk::Sampler &sampler,
+                                    const vk::ImageLayout layout) -> DescriptorSet &
     {
 
         return *this;
     }
-    auto DescriptorSet::attachTexelBuffer(std::weak_ptr<Device> device, const uint32_t &binding,
-                                          const vk::BufferView &view) -> DescriptorSet &
+    auto DescriptorSet::attachTexelBuffer(const uint32_t &binding, const vk::BufferView &view) -> DescriptorSet &
     {
 
         return *this;

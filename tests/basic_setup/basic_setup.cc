@@ -1,4 +1,6 @@
-#include "letc/letc.hh"
+#include <letc/letc.hh>
+
+#include "model.hh"
 
 std::filesystem::path resourcePath = "../resources";
 
@@ -6,6 +8,12 @@ struct FrameData
 {
     float time;
     float frame;
+};
+
+struct LightData
+{
+    glm::vec4 position{0.0f};
+    glm::vec4 color{1.0f};
 };
 
 auto main(int argc, char *argv[]) -> int
@@ -39,16 +47,6 @@ auto main(int argc, char *argv[]) -> int
 
     auto pbrVert = shaderManager.getShader(resourcePath / "shaders" / "pbr" / "vert.spirv", "main");
     auto pbrFrag = shaderManager.getShader(resourcePath / "shaders" / "pbr" / "frag.spirv", "main");
-    auto pbrSetsLayout = pbrVert.getLayouts() | pbrFrag.getLayouts();
-
-    auto frameBuffer =
-        letc::BufferObject<FrameData>(allocator, vk::BufferUsageFlagBits::eUniformBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    frameBuffer->frame = 1.0f;
-    frameBuffer.sync();
-
-    auto frameSet = pbrSetsLayout.at(0).build(descPool);
-    frameSet->attachBuffer(device, 0, frameBuffer.get(), sizeof(FrameData));
-    auto modelSet = pbrSetsLayout.at(1).build(descPool);
 
     auto pbrPipeline =
         letc::GraphicsPipelineBuilder{}
@@ -58,15 +56,51 @@ auto main(int argc, char *argv[]) -> int
             .addVertexAttribute(0, 0, vk::Format::eR32G32B32A32Sfloat, 0)
             .addVertexBinding(1, sizeof(glm::vec4), vk::VertexInputRate::eVertex)
             .addVertexAttribute(1, 1, vk::Format::eR32G32B32A32Sfloat, 0)
-            .addVertexBinding(2, sizeof(glm::vec4), vk::VertexInputRate::eVertex)
-            .addVertexAttribute(2, 2, vk::Format::eR32G32B32A32Sfloat, 0)
-            .addVertexBinding(3, sizeof(glm::vec2), vk::VertexInputRate::eVertex)
-            .addVertexAttribute(3, 3, vk::Format::eR32G32Sfloat, 0)
+            .addVertexBinding(2, sizeof(glm::vec2), vk::VertexInputRate::eVertex)
+            .addVertexAttribute(2, 2, vk::Format::eR32G32Sfloat, 0)
             .setRendering([format](vk::PipelineRenderingCreateInfo &prci) { prci.setColorAttachmentFormats(format); })
             .build(device);
 
     auto commandPool = device->getLogical().createCommandPoolUnique(
         vk::CommandPoolCreateInfo{}.setQueueFamilyIndex(graphicsQueue.getFamily()));
+
+    auto commandBuffers =
+        device->getLogical().allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo{}
+                                                              .setCommandPool(*commandPool)
+                                                              .setLevel(vk::CommandBufferLevel::ePrimary)
+                                                              .setCommandBufferCount(2));
+
+    std::array<std::shared_ptr<letc::Image>, 2> depthImages = {
+        letc::laconic::depthImage(allocator, window->get().getWidth(), window->get().getHeight()),
+        letc::laconic::depthImage(allocator, window->get().getWidth(), window->get().getHeight())};
+
+    std::array<std::shared_ptr<letc::ImageView>, 2> depthImageViews = {
+        letc::laconic::depthImageView(device, depthImages[0]), letc::laconic::depthImageView(device, depthImages[1])};
+
+    auto frameBuffer =
+        letc::ObjectBuffer<FrameData>(allocator, vk::BufferUsageFlagBits::eUniformBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    frameBuffer->frame = 0.0f;
+    frameBuffer->time = 0.0f;
+    frameBuffer.sync();
+
+    auto camera =
+        letc::FirstPersonCamera(allocator, (float)window->get().getWidth() / (float)window->get().getHeight());
+
+    auto lights = letc::VectorBuffer<LightData>(allocator, 4, vk::BufferUsageFlagBits::eStorageBuffer,
+                                                VMA_MEMORY_USAGE_CPU_TO_GPU);
+    float s = 4.0f;
+    float h = 2.0f;
+    lights->at(0) = {{-s, h, -s, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f}};
+    lights->at(1) = {{-s, h, s, 1.0f}, {0.0f, 1.0f, 0.0f, 1.0f}};
+    lights->at(2) = {{s, h, s, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}};
+    lights->at(3) = {{s, h, -s, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}};
+
+    auto frameSet = pbrPipeline->getSetLayouts()[0].build(descPool);
+    frameSet->attachBuffer("UFrameData", frameBuffer.get(), frameBuffer.containedSize());
+    frameSet->attachBuffer("UCamera", camera.getBuffer(), camera.containedSize());
+
+    auto modelLayout = std::make_shared<letc::DescriptorSetLayout>(pbrPipeline->getSetLayouts()[1]);
+    auto models = loadModels(resourcePath / "models" / "sponza" / "Sponza.gltf", modelLayout, descPool, allocator);
 
     // while (window->get().shouldClose() == false)
     // {

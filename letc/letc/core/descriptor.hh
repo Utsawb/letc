@@ -66,19 +66,26 @@ namespace letc
     class DescriptorSet
     {
       public:
-        auto get() -> vk::DescriptorSet;
+        auto get() -> vk::DescriptorSet &;
 
-        auto attachBuffer(std::weak_ptr<Device> device, const uint32_t &binding, const vk::Buffer &buffer,
-                          const vk::DeviceSize &range, const vk::DeviceSize &offset = 0) -> DescriptorSet &;
-        auto attachImage(std::weak_ptr<Device> device, const uint32_t &binding, const vk::ImageView &view,
-                         const vk::Sampler &sampler,
+        auto attachBuffer(const std::string &name, const vk::Buffer &buffer, const vk::DeviceSize &range,
+                          const vk::DeviceSize &offset = 0) -> DescriptorSet &;
+
+        auto attachBuffer(const uint32_t &binding, const vk::Buffer &buffer, const vk::DeviceSize &range,
+                          const vk::DeviceSize &offset = 0) -> DescriptorSet &;
+
+        auto attachImage(const std::string &name, const vk::ImageView &view, const vk::Sampler &sampler,
                          const vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal) -> DescriptorSet &;
-        auto attachTexelBuffer(std::weak_ptr<Device> device, const uint32_t &binding, const vk::BufferView &view)
-            -> DescriptorSet &;
+        auto attachImage(const uint32_t &binding, const vk::ImageView &view, const vk::Sampler &sampler,
+                         const vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal) -> DescriptorSet &;
+
+        auto attachTexelBuffer(const std::string &name, const vk::BufferView &view) -> DescriptorSet &;
+        auto attachTexelBuffer(const uint32_t &binding, const vk::BufferView &view) -> DescriptorSet &;
 
       private:
         friend DescriptorSetLayout;
 
+        std::weak_ptr<Device> m_device;
         std::vector<Descriptor> m_descriptors;
         vk::DescriptorSet m_handle;
         vk::UniqueDescriptorSetLayout m_layout;

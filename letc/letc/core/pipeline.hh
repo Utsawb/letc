@@ -81,12 +81,14 @@ namespace letc
 
         auto bind(const vk::CommandBuffer &commandBuffer) const -> void;
         auto getLayout() const -> vk::PipelineLayout;
+        auto getSetLayouts() const -> std::map<uint32_t, DescriptorSetLayout>;
 
       private:
         friend class GraphicsPipelineBuilder;
 
         std::weak_ptr<Device> m_device;
         vk::PipelineLayout m_layout = nullptr;
+        std::map<uint32_t, DescriptorSetLayout> m_setLayouts;
         vk::Pipeline m_handle = nullptr;
     };
 } // namespace letc

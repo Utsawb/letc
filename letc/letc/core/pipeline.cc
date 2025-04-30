@@ -254,16 +254,15 @@ namespace letc
 
         graphicsPipeline->m_device = device_weak;
         graphicsPipeline->m_layout = pipelineLayout;
+        graphicsPipeline->m_setLayouts = combinedDescriptorSetLayouts;
         graphicsPipeline->m_handle = pipeline;
 
         return graphicsPipeline;
     }
 
-    // --- GraphicsPipeline Implementation (Unchanged) ---
-
     GraphicsPipeline::~GraphicsPipeline()
     {
-        if (auto device = m_device.lock()) // Check if device still exists
+        if (auto device = m_device.lock())
         {
             if (m_handle)
                 device->getLogical().destroyPipeline(m_handle);
@@ -280,6 +279,11 @@ namespace letc
     auto GraphicsPipeline::getLayout() const -> vk::PipelineLayout
     {
         return m_layout;
+    }
+
+    auto GraphicsPipeline::getSetLayouts() const -> std::map<uint32_t, DescriptorSetLayout>
+    {
+        return m_setLayouts;
     }
 
 } // namespace letc
