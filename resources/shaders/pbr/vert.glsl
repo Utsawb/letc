@@ -1,8 +1,8 @@
 #version 450
 #pragma shader_stage(vertex)
 
-layout(location = 0) in vec4 aPosition;
-layout(location = 1) in vec4 aNormal;
+layout(location = 0) in vec3 aPosition;
+layout(location = 1) in vec3 aNormal;
 layout(location = 2) in vec2 aTexCoord;
 
 layout(set = 0, binding = 0) uniform UFrameData {
@@ -34,7 +34,7 @@ layout(location = 1) out vec4 vNormal;
 
 void main()
 {
-    vPosition = model.model * aPosition;
-    vNormal = model.model * aNormal;
+    vPosition = model.model * vec4(aPosition, 1.0);
+    vNormal = model.model * vec4(aNormal, 1.0);
     gl_Position = camera.proj * camera.view * vPosition;
 }

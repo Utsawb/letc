@@ -33,7 +33,55 @@ namespace letc
 
         ~ObjectBuffer()
         {
-            vmaDestroyBuffer(m_allocator.lock()->get(), m_buffer, m_allocation);
+            // Only attempt destruction if the buffer handle is valid (not moved from)
+            if (m_buffer != nullptr)
+            {
+                // Lock the weak_ptr to get the allocator
+                if (auto locked_allocator = m_allocator.lock())
+                {
+                    // If allocator is valid, destroy the buffer
+                    vmaDestroyBuffer(locked_allocator->get(), m_buffer, m_allocation);
+                }
+                else
+                {
+                    // Optional: Log an error if the allocator expired before cleanup
+                    // std::cerr << "Warning: Allocator expired before ObjectBuffer cleanup for buffer " << m_buffer <<
+                    // std::endl;
+                }
+                // Prevent double deletion in case of exceptions during destruction
+                m_buffer = nullptr;
+                m_allocation = nullptr;
+            }
+        }
+        ObjectBuffer(const ObjectBuffer &) = delete;
+        ObjectBuffer &operator=(const ObjectBuffer &) = delete;
+
+        ObjectBuffer(ObjectBuffer &&other) noexcept
+            : m_allocator(std::move(other.m_allocator)), m_object(std::move(other.m_object)),
+              m_buffer(std::exchange(other.m_buffer, nullptr)), m_allocation(std::exchange(other.m_allocation, nullptr))
+        {
+        }
+
+        // 4. Move Assignment Operator
+        ObjectBuffer &operator=(ObjectBuffer &&other) noexcept
+        {
+            // Prevent self-assignment
+            if (this != &other)
+            {
+                if (auto locked_allocator = m_allocator.lock())
+                {
+                    if (m_buffer != nullptr)
+                    {
+                        vmaDestroyBuffer(locked_allocator->get(), m_buffer, m_allocation);
+                    }
+                }
+
+                m_allocator = std::move(other.m_allocator);
+                m_object = std::move(other.m_object);
+                m_buffer = std::exchange(other.m_buffer, nullptr);
+                m_allocation = std::exchange(other.m_allocation, nullptr);
+            }
+            return *this;
         }
 
         auto containedSize() -> std::size_t
@@ -74,8 +122,8 @@ namespace letc
         vk::Buffer m_buffer = nullptr;
         VmaAllocation m_allocation = nullptr;
 
-        vk::BufferCreateInfo m_bufferInfo;
-        VmaAllocationCreateInfo m_allocInfo;
+        vk::BufferCreateInfo m_bufferInfo = {};
+        VmaAllocationCreateInfo m_allocInfo = {};
 
       public:
         VectorBuffer(std::weak_ptr<Allocator> allocator, const std::size_t &initialCount,
@@ -84,7 +132,7 @@ namespace letc
             : m_allocator(allocator)
         {
 
-            m_bufferInfo.size = std::bit_ceil(sizeof(Object) * initialCount);
+            m_bufferInfo.size = initialCount == 0 ? 0 : std::bit_ceil(sizeof(Object) * initialCount);
             m_bufferInfo.usage = bufferUsage;
             m_bufferInfo.sharingMode = shareMode;
 
@@ -92,8 +140,10 @@ namespace letc
 
             if (initialCount != 0)
             {
-                vmaCreateBuffer(allocator.lock()->get(), reinterpret_cast<VkBufferCreateInfo *>(&m_bufferInfo),
-                                &m_allocInfo, reinterpret_cast<VkBuffer *>(&m_buffer), &m_allocation, nullptr);
+                auto res =
+                    vmaCreateBuffer(allocator.lock()->get(), reinterpret_cast<VkBufferCreateInfo *>(&m_bufferInfo),
+                                    &m_allocInfo, reinterpret_cast<VkBuffer *>(&m_buffer), &m_allocation, nullptr);
+                ATHROW(res == VK_SUCCESS, "failed to create buffer");
             }
 
             m_vector.resize(initialCount);
@@ -101,10 +151,62 @@ namespace letc
 
         ~VectorBuffer()
         {
+            // Only attempt destruction if the buffer handle is valid (not moved from)
             if (m_buffer != nullptr)
-                vmaDestroyBuffer(m_allocator.lock()->get(), m_buffer, m_allocation);
+            {
+                // Lock the weak_ptr to get the allocator
+                if (auto locked_allocator = m_allocator.lock())
+                {
+                    // If allocator is valid, destroy the buffer
+                    vmaDestroyBuffer(locked_allocator->get(), m_buffer, m_allocation);
+                }
+                else
+                {
+                    // Optional: Log an error if the allocator expired before cleanup
+                    // std::cerr << "Warning: Allocator expired before VectorBuffer cleanup for buffer " << m_buffer <<
+                    // std::endl;
+                }
+                // Prevent double deletion in case of exceptions during destruction
+                m_buffer = nullptr;
+                m_allocation = nullptr;
+            }
+        }
+        VectorBuffer(const VectorBuffer &) = delete;
+        VectorBuffer &operator=(const VectorBuffer &) = delete;
+
+        // Move Constructor
+        VectorBuffer(VectorBuffer &&other) noexcept
+            : m_allocator(std::move(other.m_allocator)),                // Move weak_ptr
+              m_vector(std::move(other.m_vector)),                      // Move vector contents
+              m_buffer(std::exchange(other.m_buffer, nullptr)),         // Steal buffer handle
+              m_allocation(std::exchange(other.m_allocation, nullptr)), // Steal allocation handle
+              m_bufferInfo(other.m_bufferInfo),                         // Copy buffer info
+              m_allocInfo(other.m_allocInfo)                            // Copy alloc info
+        {
         }
 
+        // Move Assignment Operator
+        VectorBuffer &operator=(VectorBuffer &&other) noexcept
+        {
+            if (this != &other)
+            {
+                if (auto locked_allocator = m_allocator.lock())
+                {
+                    if (m_buffer != nullptr)
+                    {
+                        vmaDestroyBuffer(locked_allocator->get(), m_buffer, m_allocation);
+                    }
+                }
+
+                m_allocator = std::move(other.m_allocator);
+                m_vector = std::move(other.m_vector);
+                m_buffer = std::exchange(other.m_buffer, nullptr);
+                m_allocation = std::exchange(other.m_allocation, nullptr);
+                m_bufferInfo = other.m_bufferInfo;
+                m_allocInfo = other.m_allocInfo;
+            }
+            return *this;
+        }
         auto sync() -> void
         {
             if (m_bufferInfo.size < (sizeof(Object) * m_vector.size()))
@@ -112,8 +214,10 @@ namespace letc
                 if (m_buffer != nullptr)
                     vmaDestroyBuffer(m_allocator.lock()->get(), m_buffer, m_allocation);
                 m_bufferInfo.size = std::bit_ceil(sizeof(Object) * m_vector.size());
-                vmaCreateBuffer(m_allocator.lock()->get(), reinterpret_cast<VkBufferCreateInfo *>(&m_bufferInfo),
-                                &m_allocInfo, reinterpret_cast<VkBuffer *>(&m_buffer), &m_allocation, nullptr);
+                auto res =
+                    vmaCreateBuffer(m_allocator.lock()->get(), reinterpret_cast<VkBufferCreateInfo *>(&m_bufferInfo),
+                                    &m_allocInfo, reinterpret_cast<VkBuffer *>(&m_buffer), &m_allocation, nullptr);
+                ATHROW(res == VK_SUCCESS, "failed to create buffer");
             }
 
             void *dva = nullptr;

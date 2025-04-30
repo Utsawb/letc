@@ -53,9 +53,9 @@ auto main(int argc, char *argv[]) -> int
             .addShader(pbrVert)
             .addShader(pbrFrag)
             .addVertexBinding(0, sizeof(glm::vec4), vk::VertexInputRate::eVertex)
-            .addVertexAttribute(0, 0, vk::Format::eR32G32B32A32Sfloat, 0)
+            .addVertexAttribute(0, 0, vk::Format::eR32G32B32Sfloat, 0)
             .addVertexBinding(1, sizeof(glm::vec4), vk::VertexInputRate::eVertex)
-            .addVertexAttribute(1, 1, vk::Format::eR32G32B32A32Sfloat, 0)
+            .addVertexAttribute(1, 1, vk::Format::eR32G32B32Sfloat, 0)
             .addVertexBinding(2, sizeof(glm::vec2), vk::VertexInputRate::eVertex)
             .addVertexAttribute(2, 2, vk::Format::eR32G32Sfloat, 0)
             .setRendering([format](vk::PipelineRenderingCreateInfo &prci) { prci.setColorAttachmentFormats(format); })
@@ -86,14 +86,16 @@ auto main(int argc, char *argv[]) -> int
     auto camera =
         letc::FirstPersonCamera(allocator, (float)window->get().getWidth() / (float)window->get().getHeight());
 
-    auto lights = letc::VectorBuffer<LightData>(allocator, 4, vk::BufferUsageFlagBits::eStorageBuffer,
+    auto lights = letc::VectorBuffer<LightData>(allocator, 0, vk::BufferUsageFlagBits::eStorageBuffer,
                                                 VMA_MEMORY_USAGE_CPU_TO_GPU);
     float s = 4.0f;
     float h = 2.0f;
+    lights->resize(4);
     lights->at(0) = {{-s, h, -s, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f}};
     lights->at(1) = {{-s, h, s, 1.0f}, {0.0f, 1.0f, 0.0f, 1.0f}};
     lights->at(2) = {{s, h, s, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}};
     lights->at(3) = {{s, h, -s, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}};
+    lights.sync();
 
     auto frameSet = pbrPipeline->getSetLayouts()[0].build(descPool);
     frameSet->attachBuffer("UFrameData", frameBuffer.get(), frameBuffer.containedSize());
@@ -102,10 +104,10 @@ auto main(int argc, char *argv[]) -> int
     auto modelLayout = std::make_shared<letc::DescriptorSetLayout>(pbrPipeline->getSetLayouts()[1]);
     auto models = loadModels(resourcePath / "models" / "sponza" / "Sponza.gltf", modelLayout, descPool, allocator);
 
-    // while (window->get().shouldClose() == false)
-    // {
-    //     vkfw::pollEvents();
-    // }
+    while (window->get().shouldClose() == false)
+    {
+        vkfw::pollEvents();
+    }
 
     return 0;
 }

@@ -23,7 +23,7 @@
                 }
             ]
         },
-        "_33" : {
+        "_43" : {
             "name" : "gl_PerVertex",
             "members" : [
                 {
@@ -56,7 +56,7 @@
                 }
             ]
         },
-        "_36" : {
+        "_46" : {
             "name" : "UCamera",
             "members" : [
                 {
@@ -73,7 +73,7 @@
                 }
             ]
         },
-        "_51" : {
+        "_61" : {
             "name" : "UFrameData",
             "members" : [
                 {
@@ -88,7 +88,7 @@
                 }
             ]
         },
-        "_54" : {
+        "_64" : {
             "name" : "SLight",
             "members" : [
                 {
@@ -103,12 +103,12 @@
                 }
             ]
         },
-        "_56" : {
+        "_66" : {
             "name" : "BLights",
             "members" : [
                 {
                     "name" : "lights",
-                    "type" : "_54",
+                    "type" : "_64",
                     "array" : [
                         0
                     ],
@@ -123,12 +123,12 @@
     },
     "inputs" : [
         {
-            "type" : "vec4",
+            "type" : "vec3",
             "name" : "aPosition",
             "location" : 0
         },
         {
-            "type" : "vec4",
+            "type" : "vec3",
             "name" : "aNormal",
             "location" : 1
         },
@@ -152,7 +152,7 @@
     ],
     "ssbos" : [
         {
-            "type" : "_56",
+            "type" : "_66",
             "name" : "BLights",
             "block_size" : 0,
             "set" : 0,
@@ -168,14 +168,14 @@
             "binding" : 0
         },
         {
-            "type" : "_36",
+            "type" : "_46",
             "name" : "UCamera",
             "block_size" : 128,
             "set" : 0,
             "binding" : 1
         },
         {
-            "type" : "_51",
+            "type" : "_61",
             "name" : "UFrameData",
             "block_size" : 8,
             "set" : 0,
