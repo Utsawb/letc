@@ -75,6 +75,28 @@ namespace letc
             return std::make_shared<ImageView>(device, depthImageViewCreateInfo);
         }
 
+        inline auto transitionImageLayout(const vk::CommandBuffer &commandBuffer, vk::Image image,
+                                          vk::ImageAspectFlags aspectMask, vk::ImageLayout oldLayout,
+                                          vk::ImageLayout newLayout, vk::AccessFlags srcAccessMask,
+                                          vk::AccessFlags dstAccessMask, vk::PipelineStageFlags srcStageMask,
+                                          vk::PipelineStageFlags dstStageMask, uint32_t baseMipLevel = 0,
+                                          uint32_t levelCount = 1, uint32_t baseArrayLayer = 0, uint32_t layerCount = 1)
+            -> void
+        {
+            vk::ImageMemoryBarrier barrier{};
+            barrier.setOldLayout(oldLayout);
+            barrier.setNewLayout(newLayout);
+            barrier.setSrcQueueFamilyIndex(vk::QueueFamilyIgnored);
+            barrier.setDstQueueFamilyIndex(vk::QueueFamilyIgnored);
+            barrier.setImage(image);
+            barrier.setSubresourceRange(
+                vk::ImageSubresourceRange{aspectMask, baseMipLevel, levelCount, baseArrayLayer, layerCount});
+            barrier.setSrcAccessMask(srcAccessMask);
+            barrier.setDstAccessMask(dstAccessMask);
+
+            commandBuffer.pipelineBarrier(srcStageMask, dstStageMask, {}, nullptr, nullptr, barrier);
+        }
+
         inline auto transitionImageLayout(const vk::CommandBuffer &commandBuffer, std::weak_ptr<Image> image,
                                           vk::ImageAspectFlags aspectMask, vk::ImageLayout oldLayout,
                                           vk::ImageLayout newLayout, vk::AccessFlags srcAccessMask,

@@ -73,7 +73,7 @@
                 }
             ]
         },
-        "_61" : {
+        "_58" : {
             "name" : "UFrameData",
             "members" : [
                 {
@@ -88,7 +88,7 @@
                 }
             ]
         },
-        "_64" : {
+        "_61" : {
             "name" : "SLight",
             "members" : [
                 {
@@ -103,12 +103,12 @@
                 }
             ]
         },
-        "_66" : {
+        "_63" : {
             "name" : "BLights",
             "members" : [
                 {
                     "name" : "lights",
-                    "type" : "_64",
+                    "type" : "_61",
                     "array" : [
                         0
                     ],
@@ -131,11 +131,6 @@
             "type" : "vec3",
             "name" : "aNormal",
             "location" : 1
-        },
-        {
-            "type" : "vec2",
-            "name" : "aTexCoord",
-            "location" : 2
         }
     ],
     "outputs" : [
@@ -152,7 +147,7 @@
     ],
     "ssbos" : [
         {
-            "type" : "_66",
+            "type" : "_63",
             "name" : "BLights",
             "block_size" : 0,
             "set" : 0,
@@ -175,7 +170,7 @@
             "binding" : 1
         },
         {
-            "type" : "_61",
+            "type" : "_58",
             "name" : "UFrameData",
             "block_size" : 8,
             "set" : 0,

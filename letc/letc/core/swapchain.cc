@@ -72,6 +72,7 @@ namespace letc
         auto swapchain = std::make_shared<Swapchain>();
         swapchain->m_instance = instance;
         swapchain->m_device = device;
+        swapchain->m_info = swapchainInfo;
         swapchain->m_format = m_format;
         swapchain->m_presentMode = m_presentMode;
         swapchain->m_surface = surface;
@@ -93,9 +94,31 @@ namespace letc
         m_instance.lock()->get().destroySurfaceKHR(m_surface);
     }
 
+    auto Swapchain::get() -> vk::SwapchainKHR &
+    {
+        return m_handle;
+    }
+
     auto Swapchain::getFormat() const -> vk::SurfaceFormatKHR
     {
         return m_format;
+    }
+
+    auto Swapchain::getExtent() const -> vk::Extent2D
+    {
+        return m_info.imageExtent;
+    }
+    auto Swapchain::getImageCount() const -> uint32_t
+    {
+        return m_images.size();
+    }
+    auto Swapchain::getImages() -> std::vector<vk::Image> &
+    {
+        return m_images;
+    }
+    auto Swapchain::getImageViews() -> std::vector<vk::ImageView> &
+    {
+        return m_views;
     }
 
 } // namespace letc

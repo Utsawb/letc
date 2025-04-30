@@ -6,7 +6,7 @@
         }
     ],
     "types" : {
-        "_16" : {
+        "_15" : {
             "name" : "UFrameData",
             "members" : [
                 {
@@ -21,7 +21,7 @@
                 }
             ]
         },
-        "_20" : {
+        "_19" : {
             "name" : "UCamera",
             "members" : [
                 {
@@ -38,7 +38,7 @@
                 }
             ]
         },
-        "_23" : {
+        "_22" : {
             "name" : "SLight",
             "members" : [
                 {
@@ -53,12 +53,12 @@
                 }
             ]
         },
-        "_25" : {
+        "_24" : {
             "name" : "BLights",
             "members" : [
                 {
                     "name" : "lights",
-                    "type" : "_23",
+                    "type" : "_22",
                     "array" : [
                         0
                     ],
@@ -70,7 +70,7 @@
                 }
             ]
         },
-        "_28" : {
+        "_27" : {
             "name" : "UModel",
             "members" : [
                 {
@@ -91,13 +91,13 @@
     "inputs" : [
         {
             "type" : "vec4",
-            "name" : "vPosition",
-            "location" : 0
+            "name" : "vNormal",
+            "location" : 1
         },
         {
             "type" : "vec4",
-            "name" : "vNormal",
-            "location" : 1
+            "name" : "vPosition",
+            "location" : 0
         }
     ],
     "outputs" : [
@@ -109,7 +109,7 @@
     ],
     "ssbos" : [
         {
-            "type" : "_25",
+            "type" : "_24",
             "name" : "BLights",
             "block_size" : 0,
             "set" : 0,
@@ -118,21 +118,21 @@
     ],
     "ubos" : [
         {
-            "type" : "_16",
+            "type" : "_15",
             "name" : "UFrameData",
             "block_size" : 8,
             "set" : 0,
             "binding" : 0
         },
         {
-            "type" : "_20",
+            "type" : "_19",
             "name" : "UCamera",
             "block_size" : 128,
             "set" : 0,
             "binding" : 1
         },
         {
-            "type" : "_28",
+            "type" : "_27",
             "name" : "UModel",
             "block_size" : 128,
             "set" : 1,

@@ -18,7 +18,7 @@ struct Model
     letc::ObjectBuffer<Uniform> uniform;
     std::shared_ptr<letc::DescriptorSet> ds;
 
-    letc::VectorBuffer<unsigned int> index;
+    letc::VectorBuffer<unsigned short> index;
     letc::VectorBuffer<glm::vec3> position;
     letc::VectorBuffer<glm::vec3> normal;
 
@@ -75,9 +75,10 @@ struct Model
         c.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pl, 1, 1, &ds->get(), 0, nullptr);
 
         vk::Buffer vertexBuffers[] = {position.get(), normal.get()};
-        vk::DeviceSize offsets[] = {0, 0, 0, 0};
-        c.bindVertexBuffers(0, 4, vertexBuffers, offsets);
-        c.bindIndexBuffer(index.get(), 0, vk::IndexType::eUint32);
+        vk::DeviceSize offsets[] = {0, 0};
+        // Bind only 2 buffers, starting from binding 0
+        c.bindVertexBuffers(0, 2, vertexBuffers, offsets); // Change 4 to 2
+        c.bindIndexBuffer(index.get(), 0, vk::IndexType::eUint16);
         c.drawIndexed(static_cast<uint32_t>(index->size()), 1, 0, 0, 0);
     }
 };
@@ -96,8 +97,14 @@ auto loadNode(std::vector<Model> &loadedModels, const tinygltf::Model &gltfModel
               std::weak_ptr<letc::Allocator> allocator, std::weak_ptr<letc::DescriptorSetLayout> layout,
               std::weak_ptr<letc::DescriptorSetPool> pool, glm::mat4 currentTransform) -> void
 {
+    node.translation;
+    node.rotation;
+    node.scale;
+    
     for (const auto &primitive : gltfModel.meshes[node.mesh].primitives)
     {
+        const auto &mesh = gltfModel.meshes[node.mesh];
+
         // --- Vertex Attribute Data ---
         const unsigned char *basePosPtr = nullptr;
         const unsigned char *baseNorPtr = nullptr;
@@ -203,7 +210,7 @@ auto loadNode(std::vector<Model> &loadedModels, const tinygltf::Model &gltfModel
         auto &model = loadedModels.back();
 
         model.index->resize(indexCount);
-        std::memcpy(model.index->data(), baseIndexPtr, sizeof(unsigned int) * indexCount);
+        std::memcpy(model.index->data(), baseIndexPtr, sizeof(unsigned short) * indexCount);
         model.index.sync();
 
         model.position->resize(vertexCount);
@@ -211,7 +218,7 @@ auto loadNode(std::vector<Model> &loadedModels, const tinygltf::Model &gltfModel
         model.position.sync();
 
         model.normal->resize(vertexCount);
-        std::memcpy(model.normal->data(), posPtr, sizeof(glm::vec3) * vertexCount);
+        std::memcpy(model.normal->data(), norPtr, sizeof(glm::vec3) * vertexCount);
         model.normal.sync();
 
         model.ds = layout.lock()->build(pool);
@@ -258,7 +265,21 @@ inline auto loadModels(const std::filesystem::path &path, std::shared_ptr<letc::
                           nullptr);
     std::string err;
     std::string warn;
-    bool ret = loader.LoadASCIIFromFile(&gltfModel, &err, &warn, path);
+
+    bool ret;
+
+    if (path.extension() == ".glb")
+    {
+        ret = loader.LoadBinaryFromFile(&gltfModel, &err, &warn, path);
+    }
+    else if (path.extension() == ".gltf")
+    {
+        ret = loader.LoadASCIIFromFile(&gltfModel, &err, &warn, path);
+    }
+    else
+    {
+        throw std::runtime_error("unknown file ext");
+    }
 
     if (!warn.empty())
     {

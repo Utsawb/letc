@@ -245,6 +245,11 @@ namespace letc
         {
             return &m_vector;
         }
+
+        auto getContainer() -> std::vector<Object> &
+        {
+            return m_vector;
+        }
     };
 
 } // namespace letc

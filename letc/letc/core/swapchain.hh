@@ -29,13 +29,19 @@ namespace letc
     {
       public:
         ~Swapchain();
+        auto get() -> vk::SwapchainKHR &;
         auto getFormat() const -> vk::SurfaceFormatKHR;
+        auto getExtent() const -> vk::Extent2D;
+        auto getImageCount() const -> uint32_t;
+        auto getImages() -> std::vector<vk::Image> &;
+        auto getImageViews() -> std::vector<vk::ImageView> &;
 
       private:
         friend SwapchainBuilder;
 
         std::weak_ptr<Instance> m_instance;
         std::weak_ptr<Device> m_device;
+        vk::SwapchainCreateInfoKHR m_info;
         vk::SurfaceFormatKHR m_format;
         vk::PresentModeKHR m_presentMode;
         vk::SurfaceKHR m_surface;
