@@ -68,6 +68,11 @@ namespace letc
             populateResource(r, vk::DescriptorType::eSampledImage);
         }
 
+        for (const auto &r : resources.storage_images)
+        {
+            populateResource(r, vk::DescriptorType::eStorageImage);
+        }
+
         std::vector<vk::PushConstantRange> pcrs;
         for (const auto &r : resources.push_constant_buffers)
         {

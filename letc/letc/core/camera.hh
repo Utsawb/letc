@@ -48,7 +48,7 @@ namespace letc
                           const glm::vec3 &position = glm::vec3{0.0f},
                           const float yaw = -90.0f,          // Default yaw facing -Z
                           const float pitch = 0.0f,          // Default pitch
-                          const float positionSpeed = 2.5f,  // Adjusted default speed
+                          const float positionSpeed = 10.5f,  // Adjusted default speed
                           const float rotationSpeed = 0.1f); // This now controls sensitivity
         auto sync() -> void;
 

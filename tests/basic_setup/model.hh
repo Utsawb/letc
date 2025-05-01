@@ -83,24 +83,28 @@ struct Model
     }
 };
 
-auto printAccInfo(const tinygltf::Accessor &acc) -> void
-{
-    std::println("Name: {}, Count: {}", acc.type, acc.count);
-}
-
-auto printViewInfo(const tinygltf::BufferView &view) -> void
-{
-    std::println("Length: {}", view.byteLength);
-}
-
 auto loadNode(std::vector<Model> &loadedModels, const tinygltf::Model &gltfModel, const tinygltf::Node &node,
               std::weak_ptr<letc::Allocator> allocator, std::weak_ptr<letc::DescriptorSetLayout> layout,
               std::weak_ptr<letc::DescriptorSetPool> pool, glm::mat4 currentTransform) -> void
 {
-    node.translation;
-    node.rotation;
-    node.scale;
-    
+    const auto &tRaw = node.translation;
+    const auto &rRaw = node.rotation;
+    const auto &sRaw = node.scale;
+
+    if (node.translation.size() > 0)
+    {
+        currentTransform = glm::translate(currentTransform, glm::vec3{tRaw[0], tRaw[1], tRaw[2]});
+    }
+    if (node.rotation.size() > 0)
+    {
+        // currentTransform *= glm::mat4_cast(glm::quat{rRaw[]});
+    }
+    if (node.scale.size() > 0)
+    {
+        std::println("Scaling, {}, {}, {}", sRaw[0], sRaw[1], sRaw[2]);
+        currentTransform = glm::scale(currentTransform, glm::vec3{sRaw[0], sRaw[1], sRaw[2]});
+    }
+
     for (const auto &primitive : gltfModel.meshes[node.mesh].primitives)
     {
         const auto &mesh = gltfModel.meshes[node.mesh];

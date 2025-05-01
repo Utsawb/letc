@@ -32,5 +32,6 @@ layout(location = 0) out vec4 color;
 
 void main()
 {
-    color = vNormal;
+    vec3 normed = normalize(vNormal.xyz);
+    color = vec4(normed, 1.0);
 }
