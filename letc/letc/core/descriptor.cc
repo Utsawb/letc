@@ -195,6 +195,8 @@ namespace letc
             vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, 1024},
             vk::DescriptorPoolSize{vk::DescriptorType::eStorageTexelBuffer, 1024},
             vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler, 1024},
+            vk::DescriptorPoolSize{vk::DescriptorType::eStorageImage, 1024},
+            vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler, 1024},
         };
         vk::DescriptorPoolCreateInfo descriptorPoolInfo{};
         descriptorPoolInfo.setMaxSets(1024);

@@ -63,16 +63,19 @@ auto main(int argc, char *argv[]) -> int
     auto pbrVert = shaderManager.getShader(resourcePath / "shaders" / "pbr" / "vert.spirv", "main");
     auto pbrFrag = shaderManager.getShader(resourcePath / "shaders" / "pbr" / "frag.spirv", "main");
 
-    auto pbrPipeline =
-        letc::GraphicsPipelineBuilder{}
-            .addShader(pbrVert)
-            .addShader(pbrFrag)
-            .addVertexBinding(0, sizeof(glm::vec3), vk::VertexInputRate::eVertex)
-            .addVertexAttribute(0, 0, vk::Format::eR32G32B32Sfloat, 0)
-            .addVertexBinding(1, sizeof(glm::vec3), vk::VertexInputRate::eVertex)
-            .addVertexAttribute(1, 1, vk::Format::eR32G32B32Sfloat, 0)
-            .setRendering([format](vk::PipelineRenderingCreateInfo &prci) { prci.setColorAttachmentFormats(format); })
-            .build(device);
+    format = vk::Format::eR8G8B8A8Unorm;
+    auto depthFormat = vk::Format::eD32Sfloat;
+    auto pbrPipeline = letc::GraphicsPipelineBuilder{}
+                           .addShader(pbrVert)
+                           .addShader(pbrFrag)
+                           .addVertexBinding(0, sizeof(glm::vec3), vk::VertexInputRate::eVertex)
+                           .addVertexAttribute(0, 0, vk::Format::eR32G32B32Sfloat, 0)
+                           .addVertexBinding(1, sizeof(glm::vec3), vk::VertexInputRate::eVertex)
+                           .addVertexAttribute(1, 1, vk::Format::eR32G32B32Sfloat, 0)
+                           .setRendering([format, depthFormat](vk::PipelineRenderingCreateInfo &prci) {
+                               prci.setColorAttachmentFormats(format).setDepthAttachmentFormat(depthFormat);
+                           })
+                           .build(device);
 
     shaderManager.add(resourcePath / "shaders" / "dof" / "compute.spirv", "main");
     auto postProcessCompute = shaderManager.getShader(resourcePath / "shaders" / "dof" / "compute.spirv", "main");
@@ -111,6 +114,15 @@ auto main(int argc, char *argv[]) -> int
                                                          .setQueueFamilyIndex(graphicsQueueInfo.getFamily())
                                                          .setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer));
 
+    vk::UniqueSampler depthSampler =
+        device->getLogical().createSamplerUnique(vk::SamplerCreateInfo{}
+                                                     .setMagFilter(vk::Filter::eNearest)
+                                                     .setMinFilter(vk::Filter::eNearest)
+                                                     .setAddressModeU(vk::SamplerAddressMode::eClampToEdge)
+                                                     .setAddressModeV(vk::SamplerAddressMode::eClampToEdge)
+                                                     .setAddressModeW(vk::SamplerAddressMode::eClampToEdge)
+                                                     .setMipmapMode(vk::SamplerMipmapMode::eNearest));
+
     // --- Per-Frame Resources ---
     std::vector<vk::UniqueCommandBuffer> commandBuffers;
     std::vector<vk::UniqueSemaphore> imageAvailableSemaphores;
@@ -135,17 +147,22 @@ auto main(int argc, char *argv[]) -> int
         depthImages.push_back(letc::laconic::depthImage(allocator, extent.width, extent.height));
         depthImageViews.push_back(letc::laconic::depthImageView(device, depthImages[i]));
 
-        auto colorImageCreateInfo = vk::ImageCreateInfo{}
-                                        .setImageType(vk::ImageType::e2D)
-                                        .setFormat(format)
-                                        .setExtent({extent.width, extent.height, 1})
-                                        .setMipLevels(1)
-                                        .setArrayLayers(1)
-                                        .setSamples(vk::SampleCountFlagBits::e1)
-                                        .setTiling(vk::ImageTiling::eOptimal)
-                                        .setUsage(vk::ImageUsageFlagBits::eColorAttachment |
-                                                  vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage)
-                                        .setInitialLayout(vk::ImageLayout::eUndefined);
+        // --> MODIFIED: Create Offscreen Color Image & View
+        auto colorImageCreateInfo =
+            vk::ImageCreateInfo{}
+                .setImageType(vk::ImageType::e2D)
+                // --> CHANGED: Use UNORM format supporting storage
+                .setFormat(vk::Format::eR8G8B8A8Unorm)
+                .setExtent({extent.width, extent.height, 1})
+                .setMipLevels(1)
+                .setArrayLayers(1)
+                .setSamples(vk::SampleCountFlagBits::e1)
+                .setTiling(vk::ImageTiling::eOptimal)
+                // --> ADDED: TransferSrc for Blit
+                .setUsage(vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eStorage |
+                          vk::ImageUsageFlagBits::eSampled |
+                          vk::ImageUsageFlagBits::eTransferSrc) // Added Sampled (optional) + TransferSrc
+                .setInitialLayout(vk::ImageLayout::eUndefined);
 
         offscreenColorImages.push_back(
             std::make_shared<letc::Image>(allocator, colorImageCreateInfo, VMA_MEMORY_USAGE_GPU_ONLY));
@@ -153,7 +170,8 @@ auto main(int argc, char *argv[]) -> int
         auto colorImageViewCreateInfo = vk::ImageViewCreateInfo{}
                                             .setImage(offscreenColorImages[i]->get())
                                             .setViewType(vk::ImageViewType::e2D)
-                                            .setFormat(format)
+                                            // --> CHANGED: Match image format
+                                            .setFormat(vk::Format::eR8G8B8A8Unorm)
                                             .setSubresourceRange(vk::ImageSubresourceRange{}
                                                                      .setAspectMask(vk::ImageAspectFlagBits::eColor)
                                                                      .setLevelCount(1)
@@ -288,16 +306,16 @@ auto main(int argc, char *argv[]) -> int
         letc::laconic::transitionImageLayout(
             cmd, depthImages[currentFrame], vk::ImageAspectFlagBits::eDepth, vk::ImageLayout::eUndefined,
             vk::ImageLayout::eDepthAttachmentOptimal, {}, vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-            vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests,
+            vk::PipelineStageFlagBits::eTopOfPipe,
             vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests);
 
         letc::laconic::transitionImageLayout(
-            cmd, swapchain->getImages()[imageIndex], vk::ImageAspectFlagBits::eColor, vk::ImageLayout::eUndefined,
+            cmd, offscreenColorImages[currentFrame], vk::ImageAspectFlagBits::eColor, vk::ImageLayout::eUndefined,
             vk::ImageLayout::eColorAttachmentOptimal, {}, vk::AccessFlagBits::eColorAttachmentWrite,
-            vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eColorAttachmentOutput);
+            vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eColorAttachmentOutput);
 
         vk::RenderingAttachmentInfo colorAttachment{};
-        colorAttachment.setImageView(swapchain->getImageViews()[imageIndex]);
+        colorAttachment.setImageView(offscreenColorImageViews[currentFrame]->get());
         colorAttachment.setImageLayout(vk::ImageLayout::eColorAttachmentOptimal);
         colorAttachment.setLoadOp(vk::AttachmentLoadOp::eClear);
         colorAttachment.setStoreOp(vk::AttachmentStoreOp::eStore);
@@ -344,13 +362,124 @@ auto main(int argc, char *argv[]) -> int
 
         cmd.endRendering();
 
-        letc::laconic::transitionImageLayout(cmd, swapchain->getImages()[imageIndex], vk::ImageAspectFlagBits::eColor,
-                                             vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR,
-                                             vk::AccessFlagBits::eColorAttachmentWrite, {},
+        letc::laconic::transitionImageLayout(cmd, offscreenColorImages[currentFrame], vk::ImageAspectFlagBits::eColor,
+                                             vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eGeneral,
+                                             vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eShaderRead,
                                              vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                                             vk::PipelineStageFlagBits::eComputeShader);
+
+        letc::laconic::transitionImageLayout(
+            cmd, depthImages[currentFrame],
+            vk::ImageAspectFlagBits::eDepth, // CORRECT for D32_SFLOAT
+            vk::ImageLayout::eDepthAttachmentOptimal,
+            // --> CHANGED: Optimal layout for sampling
+            vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+            // --> CHANGED: Read access for shader sampling
+            vk::AccessFlagBits::eShaderRead, vk::PipelineStageFlagBits::eLateFragmentTests,
+            vk::PipelineStageFlagBits::eComputeShader);
+
+        letc::laconic::transitionImageLayout(cmd, swapchain->getImages()[imageIndex], vk::ImageAspectFlagBits::eColor,
+                                             vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, {},
+                                             vk::AccessFlagBits::eShaderWrite, vk::PipelineStageFlagBits::eTopOfPipe,
+                                             vk::PipelineStageFlagBits::eComputeShader);
+
+        std::vector<vk::WriteDescriptorSet> computeWrites;
+
+        // Input Color (Binding 0) - Storage Image (or Sampled)
+        vk::DescriptorImageInfo colorInputInfo{};
+        colorInputInfo.setImageView(offscreenColorImageViews[currentFrame]->get());
+        colorInputInfo.setImageLayout(vk::ImageLayout::eGeneral); // Or ShaderReadOnlyOptimal if read-only
+        computeWrites.push_back(vk::WriteDescriptorSet{}
+                                    .setDstSet(*computeDescriptorSets[currentFrame])
+                                    .setDstBinding(0) // Input color binding
+                                    .setDescriptorCount(1)
+                                    .setDescriptorType(vk::DescriptorType::eStorageImage) // Use Storage for read/write
+                                    .setImageInfo(colorInputInfo));
+
+        // Input Depth (Binding 1) - --> CHANGED to Combined Image Sampler
+        vk::DescriptorImageInfo depthInputInfo{};
+        depthInputInfo.setImageView(depthImageViews[currentFrame]->get());
+        depthInputInfo.setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal); // Use read-only layout for sampling
+        depthInputInfo.setSampler(*depthSampler);                               // --> Set the sampler
+        computeWrites.push_back(vk::WriteDescriptorSet{}
+                                    .setDstSet(*computeDescriptorSets[currentFrame])
+                                    .setDstBinding(1) // Input depth binding
+                                    .setDescriptorCount(1)
+                                    // --> CHANGED descriptor type
+                                    .setDescriptorType(vk::DescriptorType::eCombinedImageSampler)
+                                    .setImageInfo(depthInputInfo));
+
+        // Output Color (Binding 2) - Storage Image (writing back to offscreen)
+        vk::DescriptorImageInfo computeOutputInfo{};
+        computeOutputInfo.setImageView(offscreenColorImageViews[currentFrame]->get());
+        computeOutputInfo.setImageLayout(vk::ImageLayout::eGeneral);
+        computeWrites.push_back(vk::WriteDescriptorSet{}
+                                    .setDstSet(*computeDescriptorSets[currentFrame])
+                                    .setDstBinding(2) // Output color binding
+                                    .setDescriptorCount(1)
+                                    .setDescriptorType(vk::DescriptorType::eStorageImage)
+                                    .setImageInfo(computeOutputInfo));
+
+        device->getLogical().updateDescriptorSets(computeWrites, nullptr);
+
+        cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *computePipeline);
+        cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *computePipelineLayout, 0, 1,
+                               &(*computeDescriptorSets[currentFrame]), 0, nullptr);
+
+        uint32_t groupCountX = (extent.width / 32);
+        uint32_t groupCountY = (extent.height / 32);
+        cmd.dispatch(groupCountX, groupCountY, 1);
+
+        // --- Barrier Before Blit ---
+
+        // Transition Offscreen image (Compute Output) to Transfer Source
+        letc::laconic::transitionImageLayout(cmd, offscreenColorImages[currentFrame], vk::ImageAspectFlagBits::eColor,
+                                             vk::ImageLayout::eGeneral,            // From compute write
+                                             vk::ImageLayout::eTransferSrcOptimal, // To blit source
+                                             vk::AccessFlagBits::eShaderWrite,     // Wait for compute write
+                                             vk::AccessFlagBits::eTransferRead,    // Read access for blit
+                                             vk::PipelineStageFlagBits::eComputeShader,
+                                             vk::PipelineStageFlagBits::eTransfer);
+
+        // Transition Swapchain image to Transfer Destination
+        letc::laconic::transitionImageLayout(cmd, swapchain->getImages()[imageIndex], vk::ImageAspectFlagBits::eColor,
+                                             vk::ImageLayout::eUndefined,           // Current layout (after acquire)
+                                             vk::ImageLayout::eTransferDstOptimal,  // To blit destination
+                                             {},                                    // No prior access needed
+                                             vk::AccessFlagBits::eTransferWrite,    // Write access for blit
+                                             vk::PipelineStageFlagBits::eTopOfPipe, // Can start early
+                                             vk::PipelineStageFlagBits::eTransfer);
+
+        // --- Blit Image Command ---
+        vk::ImageBlit blitRegion{};
+        blitRegion.srcSubresource.setAspectMask(vk::ImageAspectFlagBits::eColor);
+        blitRegion.srcSubresource.setLayerCount(1);
+        blitRegion.srcOffsets[1] = vk::Offset3D{static_cast<int32_t>(extent.width), static_cast<int32_t>(extent.height),
+                                                1}; // Source region extent
+        blitRegion.dstSubresource.setAspectMask(vk::ImageAspectFlagBits::eColor);
+        blitRegion.dstSubresource.setLayerCount(1);
+        blitRegion.dstOffsets[1] = vk::Offset3D{static_cast<int32_t>(extent.width), static_cast<int32_t>(extent.height),
+                                                1}; // Destination region extent
+
+        cmd.blitImage(offscreenColorImages[currentFrame]->get(), vk::ImageLayout::eTransferSrcOptimal,
+                      swapchain->getImages()[imageIndex], vk::ImageLayout::eTransferDstOptimal, 1, &blitRegion,
+                      vk::Filter::eNearest // Or vk::Filter::eLinear if supported and desired
+        );
+
+        // --- Barrier Before Present ---
+
+        // Transition Swapchain Image from Transfer Dst to PresentSrc
+        letc::laconic::transitionImageLayout(cmd, swapchain->getImages()[imageIndex], vk::ImageAspectFlagBits::eColor,
+                                             vk::ImageLayout::eTransferDstOptimal, // From blit write
+                                             vk::ImageLayout::ePresentSrcKHR,      // To present
+                                             vk::AccessFlagBits::eTransferWrite,   // Wait for blit write
+                                             {},                                   // No subsequent access needed
+                                             vk::PipelineStageFlagBits::eTransfer,
                                              vk::PipelineStageFlagBits::eBottomOfPipe);
 
+        // --- End Command Buffer and Submit (Existing) ---
         cmd.end();
+        // ... submit and present ...
 
         vk::Semaphore waitSemaphores[] = {*imageAvailableSemaphores[currentFrame]};
         vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};

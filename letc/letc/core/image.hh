@@ -49,7 +49,8 @@ namespace letc
             depthImageCreateInfo.setArrayLayers(1);
             depthImageCreateInfo.setSamples(vk::SampleCountFlagBits::e1);
             depthImageCreateInfo.setTiling(vk::ImageTiling::eOptimal);
-            depthImageCreateInfo.setUsage(vk::ImageUsageFlagBits::eDepthStencilAttachment);
+            depthImageCreateInfo.setUsage(vk::ImageUsageFlagBits::eDepthStencilAttachment |
+                                          vk::ImageUsageFlagBits::eSampled);
             depthImageCreateInfo.setSharingMode(vk::SharingMode::eExclusive);
             depthImageCreateInfo.setQueueFamilyIndices(nullptr);
             depthImageCreateInfo.setInitialLayout(vk::ImageLayout::eUndefined);

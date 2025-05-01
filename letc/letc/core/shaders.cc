@@ -65,7 +65,7 @@ namespace letc
 
         for (const auto &r : resources.sampled_images)
         {
-            populateResource(r, vk::DescriptorType::eSampledImage);
+            populateResource(r, vk::DescriptorType::eCombinedImageSampler);
         }
 
         for (const auto &r : resources.storage_images)

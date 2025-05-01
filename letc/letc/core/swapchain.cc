@@ -27,18 +27,40 @@ namespace letc
         auto surface = window.lock()->createSurface(instance);
         auto surfaceCapabilites = device.lock()->getPhysical().getSurfaceCapabilitiesKHR(surface);
 
-        auto swapchainInfo = vk::SwapchainCreateInfoKHR{}
-                                 .setPresentMode(m_presentMode)
-                                 .setClipped(true)
-                                 .setSurface(surface)
-                                 .setImageFormat(m_format.format)
-                                 .setImageColorSpace(m_format.colorSpace)
-                                 .setMinImageCount(surfaceCapabilites.minImageCount + 1)
-                                 .setImageArrayLayers(1)
-                                 .setImageUsage(vk::ImageUsageFlagBits::eColorAttachment)
-                                 .setImageSharingMode(vk::SharingMode::eExclusive)
-                                 .setPreTransform(surfaceCapabilites.currentTransform)
-                                 .setCompositeAlpha(vk::CompositeAlphaFlagBitsKHR::eOpaque);
+        // --> ADDED: Query and Select Surface Format
+        auto surfaceFormats = device.lock()->getPhysical().getSurfaceFormatsKHR(surface);
+        vk::SurfaceFormatKHR selectedFormat = surfaceFormats[0]; // Default to first
+        for (const auto &availableFormat : surfaceFormats)
+        {
+            // Prefer B8G8R8A8_SRGB or R8G8B8A8_SRGB if available
+            if (availableFormat.format == vk::Format::eB8G8R8A8Srgb &&
+                availableFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
+            {
+                selectedFormat = availableFormat;
+                break;
+            }
+            if (availableFormat.format == vk::Format::eR8G8B8A8Srgb &&
+                availableFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
+            {
+                selectedFormat = availableFormat;
+                // Don't break, maybe BGR is preferred
+            }
+        }
+        m_format = selectedFormat; // Store the selected format
+
+        auto swapchainInfo =
+            vk::SwapchainCreateInfoKHR{}
+                .setPresentMode(m_presentMode)
+                .setClipped(true)
+                .setSurface(surface)
+                .setImageFormat(m_format.format)
+                .setImageColorSpace(m_format.colorSpace)
+                .setMinImageCount(surfaceCapabilites.minImageCount + 1)
+                .setImageArrayLayers(1)
+                .setImageUsage(vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst)
+                .setImageSharingMode(vk::SharingMode::eExclusive)
+                .setPreTransform(surfaceCapabilites.currentTransform)
+                .setCompositeAlpha(vk::CompositeAlphaFlagBitsKHR::eOpaque);
 
         if (surfaceCapabilites.currentExtent ==
             vk::Extent2D{std::numeric_limits<uint32_t>::max(), std::numeric_limits<uint32_t>::max()})
