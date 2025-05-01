@@ -3,7 +3,7 @@
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
-layout(set = 0, binding = 0, rgba8) uniform readonly image2D colorAttachment;
+layout(set = 0, binding = 0) uniform sampler2D colorAttachment;
 layout(set = 0, binding = 1) uniform sampler2D depthAttachment;
 layout(set = 0, binding = 2, rgba8) uniform writeonly image2D swapchainAttachment;
 
@@ -63,11 +63,10 @@ void main()
     float depthValue = linearize_depth(texture(depthAttachment, uv).r, 0.1, 1000.0);
     float centreDepth = linearize_depth(texture(depthAttachment, vec2(0.5)).r, 0.1, 1000.0);
 
-    vec4 trueColor = imageLoad(colorAttachment, pixelCoords);
+    vec4 trueColor = texture(colorAttachment, uv);
 
     vec4 accumulatedColor = vec4(0.0);
-    // if (abs(depthValue - centreDepth) < 0.1)
-    if (true)
+    if (abs(depthValue - centreDepth) < 0.1)
     {
         accumulatedColor = trueColor;
     }
@@ -77,7 +76,7 @@ void main()
         {
             for (int y = -7; y <= 7; ++y)
             {
-                accumulatedColor += imageLoad(colorAttachment, pixelCoords + ivec2(x, y)) * gk[x + 7][y + 7];
+                accumulatedColor += texture(colorAttachment, uv + (vec2(x, y) / vec2(imageSize))) * gk[x + 7][y + 7];
             }
         }
 

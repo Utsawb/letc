@@ -32,22 +32,35 @@ layout(location = 0) out vec4 color;
 
 void main()
 {
-    vec3 worldPos = vPosition.xyz;
-    vec3 worldNor = normalize(vNormal.xyz);
-    vec3 diffuseColor = vec3(0.0);
-    int numLights = lights.length();
+    // 1. Define Directional Light Properties
+    //    - Direction: Where the light is *coming from*. Normalize it.
+    //      (e.g., low on the horizon for sunset, slightly positive X/Z, positive Y)
+    //    - Color: A warm orange/red typical of sunsets.
+    vec3 lightDirection = normalize(vec3(0.8, 0.3, 0.2)); // Adjust X/Y/Z for desired sunset angle
+    vec3 lightColor = vec3(1.0, 0.55, 0.2); // Sunset orange-red color (Intensity included here)
 
-    for (int i = 0; i < numLights; ++i)
-    {
-        vec3 lightPos = lights[i].position.xyz;
-        vec3 lightCol = lights[i].color.rgb;
-        vec3 lightDir = normalize(lightPos - worldPos.xyz);
-        float diffuseFactor = max(dot(worldNor, lightDir), 0.0);
-        diffuseColor += lightCol * diffuseFactor * exp(-0.1 * pow(length(lightPos - worldPos.xyz), 2));
-    }
-    vec3 finalColor = vec3(0.05) + diffuseColor;
-    color = vec4(clamp(finalColor, 0.0, 1.0), 1.0);
+    // Optional: Add a dim ambient light so shadowed areas aren't pitch black
+    vec3 ambientColor = vec3(0.15, 0.08, 0.05); // Dim ambient sunset color
 
-    // vec3 normed = normalize(vNormal.xyz);
-    // color = vec4(normed, 1.0);
+    // 2. Get the Surface Normal
+    //    - Assuming vNormal is already in world space.
+    //    - Normalize it to ensure it's a unit vector.
+    vec3 N = normalize(vNormal.xyz);
+
+    // 3. Calculate Diffuse Lighting (Lambertian)
+    //    - Computes how much the surface normal aligns with the light direction.
+    //    - dot(N, lightDirection) gives cosine of the angle between them.
+    //    - max(..., 0.0) ensures surfaces facing away from the light aren't negatively lit.
+    float diffuseFactor = max(dot(N, lightDirection), 0.0);
+
+    // 4. Calculate Final Color
+    //    - Multiply the light color by the diffuse factor.
+    //    - Add the ambient color.
+    vec3 diffuseContribution = lightColor * diffuseFactor;
+    vec3 finalColor = ambientColor + diffuseContribution;
+
+    // 5. Output the color
+    //    - Use the calculated RGB color.
+    //    - Set alpha to 1.0 for opaque surfaces.
+    color = vec4(finalColor, 1.0);
 }

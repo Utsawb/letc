@@ -25,8 +25,7 @@ auto main(int argc, char *argv[]) -> int
         resourcePath = argv[1];
     }
 
-    // --- Initialization (mostly unchanged) ---
-    auto window = letc::WindowBuilder{}.setWidth(1280).setHeight(720).setTitle("fake dof").build();
+    auto window = letc::WindowBuilder{}.setWidth(1024).setHeight(1024).setTitle("fake dof").build();
     auto instance = letc::InstanceBuilder{}
                         .addExtension(vk::KHRSurfaceExtensionName)
                         .addExtension(vk::KHRGetPhysicalDeviceProperties2ExtensionName)
@@ -157,6 +156,17 @@ auto main(int argc, char *argv[]) -> int
                                                      .setAddressModeW(vk::SamplerAddressMode::eClampToEdge)
                                                      .setMipmapMode(vk::SamplerMipmapMode::eNearest));
 
+    vk::UniqueSampler colorSampler =
+        device->getLogical().createSamplerUnique(vk::SamplerCreateInfo{}
+                                                     .setMagFilter(vk::Filter::eLinear)
+                                                     .setMinFilter(vk::Filter::eLinear)
+                                                     .setAddressModeU(vk::SamplerAddressMode::eClampToEdge)
+                                                     .setAddressModeV(vk::SamplerAddressMode::eClampToEdge)
+                                                     .setAddressModeW(vk::SamplerAddressMode::eClampToEdge)
+                                                     .setMipmapMode(vk::SamplerMipmapMode::eNearest)
+                                                     .setBorderColor(vk::BorderColor::eFloatOpaqueBlack)
+                                                     .setUnnormalizedCoordinates(VK_FALSE));
+
     // --- Per-Frame Resources ---
     std::vector<vk::UniqueCommandBuffer> commandBuffers;
     std::vector<vk::UniqueSemaphore> imageAvailableSemaphores;
@@ -181,21 +191,17 @@ auto main(int argc, char *argv[]) -> int
         depthImages.push_back(letc::laconic::depthImage(allocator, extent.width, extent.height));
         depthImageViews.push_back(letc::laconic::depthImageView(device, depthImages[i]));
 
-        // --> MODIFIED: Create Offscreen Color Image & View
         auto colorImageCreateInfo =
             vk::ImageCreateInfo{}
                 .setImageType(vk::ImageType::e2D)
-                // --> CHANGED: Use UNORM format supporting storage
                 .setFormat(vk::Format::eR8G8B8A8Unorm)
                 .setExtent({extent.width, extent.height, 1})
                 .setMipLevels(1)
                 .setArrayLayers(1)
                 .setSamples(vk::SampleCountFlagBits::e1)
                 .setTiling(vk::ImageTiling::eOptimal)
-                // --> ADDED: TransferSrc for Blit
                 .setUsage(vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eStorage |
-                          vk::ImageUsageFlagBits::eSampled |
-                          vk::ImageUsageFlagBits::eTransferSrc) // Added Sampled (optional) + TransferSrc
+                          vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferSrc)
                 .setInitialLayout(vk::ImageLayout::eUndefined);
 
         offscreenColorImages.push_back(
@@ -235,6 +241,11 @@ auto main(int argc, char *argv[]) -> int
         else
         {
             window->get().set<vkfw::InputMode::eCursor>(vkfw::CursorMode::eNormal);
+        }
+
+        if (window->get().getKey(vkfw::Key::eEscape))
+        {
+            window->get().setShouldClose(true);
         }
 
         lastMouseX = mx;
@@ -366,11 +377,11 @@ auto main(int argc, char *argv[]) -> int
 
         cmd.endRendering();
 
-        letc::laconic::transitionImageLayout(cmd, offscreenColorImages[currentFrame], vk::ImageAspectFlagBits::eColor,
-                                             vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eGeneral,
-                                             vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eShaderRead,
-                                             vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                                             vk::PipelineStageFlagBits::eComputeShader);
+        letc::laconic::transitionImageLayout(
+            cmd, offscreenColorImages[currentFrame], vk::ImageAspectFlagBits::eColor,
+            vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
+            vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eShaderRead,
+            vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eComputeShader);
 
         letc::laconic::transitionImageLayout(
             cmd, depthImages[currentFrame],
@@ -392,34 +403,32 @@ auto main(int argc, char *argv[]) -> int
         // Input Color (Binding 0) - Storage Image (or Sampled)
         vk::DescriptorImageInfo colorInputInfo{};
         colorInputInfo.setImageView(offscreenColorImageViews[currentFrame]->get());
-        colorInputInfo.setImageLayout(vk::ImageLayout::eGeneral); // Or ShaderReadOnlyOptimal if read-only
+        colorInputInfo.setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+        colorInputInfo.setSampler(*colorSampler);
         computeWrites.push_back(vk::WriteDescriptorSet{}
                                     .setDstSet(*computeDescriptorSets[currentFrame])
-                                    .setDstBinding(0) // Input color binding
+                                    .setDstBinding(0)
                                     .setDescriptorCount(1)
-                                    .setDescriptorType(vk::DescriptorType::eStorageImage) // Use Storage for read/write
+                                    .setDescriptorType(vk::DescriptorType::eCombinedImageSampler)
                                     .setImageInfo(colorInputInfo));
 
-        // Input Depth (Binding 1) - --> CHANGED to Combined Image Sampler
         vk::DescriptorImageInfo depthInputInfo{};
         depthInputInfo.setImageView(depthImageViews[currentFrame]->get());
-        depthInputInfo.setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal); // Use read-only layout for sampling
-        depthInputInfo.setSampler(*depthSampler);                               // --> Set the sampler
+        depthInputInfo.setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+        depthInputInfo.setSampler(*depthSampler);
         computeWrites.push_back(vk::WriteDescriptorSet{}
                                     .setDstSet(*computeDescriptorSets[currentFrame])
-                                    .setDstBinding(1) // Input depth binding
+                                    .setDstBinding(1)
                                     .setDescriptorCount(1)
-                                    // --> CHANGED descriptor type
                                     .setDescriptorType(vk::DescriptorType::eCombinedImageSampler)
                                     .setImageInfo(depthInputInfo));
 
-        // Output Color (Binding 2) - Storage Image (writing back to offscreen)
         vk::DescriptorImageInfo computeOutputInfo{};
         computeOutputInfo.setImageView(offscreenColorImageViews[currentFrame]->get());
         computeOutputInfo.setImageLayout(vk::ImageLayout::eGeneral);
         computeWrites.push_back(vk::WriteDescriptorSet{}
                                     .setDstSet(*computeDescriptorSets[currentFrame])
-                                    .setDstBinding(2) // Output color binding
+                                    .setDstBinding(2)
                                     .setDescriptorCount(1)
                                     .setDescriptorType(vk::DescriptorType::eStorageImage)
                                     .setImageInfo(computeOutputInfo));
