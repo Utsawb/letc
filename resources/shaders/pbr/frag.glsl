@@ -32,6 +32,22 @@ layout(location = 0) out vec4 color;
 
 void main()
 {
-    vec3 normed = normalize(vNormal.xyz);
-    color = vec4(normed, 1.0);
+    vec3 worldPos = vPosition.xyz;
+    vec3 worldNor = normalize(vNormal.xyz);
+    vec3 diffuseColor = vec3(0.0);
+    int numLights = lights.length();
+
+    for (int i = 0; i < numLights; ++i)
+    {
+        vec3 lightPos = lights[i].position.xyz;
+        vec3 lightCol = lights[i].color.rgb;
+        vec3 lightDir = normalize(lightPos - worldPos.xyz);
+        float diffuseFactor = max(dot(worldNor, lightDir), 0.0);
+        diffuseColor += lightCol * diffuseFactor * exp(-0.1 * pow(length(lightPos - worldPos.xyz), 2));
+    }
+    vec3 finalColor = vec3(0.05) + diffuseColor;
+    color = vec4(clamp(finalColor, 0.0, 1.0), 1.0);
+
+    // vec3 normed = normalize(vNormal.xyz);
+    // color = vec4(normed, 1.0);
 }

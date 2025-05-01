@@ -1,83 +1,88 @@
 #version 450
 #pragma shader_stage(compute)
 
-layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
-layout(set = 0, binding = 0, rgba8) uniform readonly image2D inputColor;
-layout(set = 0, binding = 1) uniform sampler2D inputDepth;
-layout(set = 0, binding = 2, rgba8) uniform writeonly image2D outputColor;
+layout(set = 0, binding = 0, rgba8) uniform readonly image2D colorAttachment;
+layout(set = 0, binding = 1) uniform sampler2D depthAttachment;
+layout(set = 0, binding = 2, rgba8) uniform writeonly image2D swapchainAttachment;
 
-const float DEPTH_THRESHOLD = 0.1;
-const float BLUR_SIGMA = 6.0;
+layout(set = 1, binding = 0) uniform UFrameData {
+    float time;
+    float frame;
+} frameData;
 
-const int KERNEL_SIZE = 16;
-const int KERNEL_RADIUS = KERNEL_SIZE / 2;
+struct SLight {
+    vec4 position;
+    vec4 color;
+};
+
+layout(set = 1, binding = 1) uniform UCamera {
+    mat4 proj;
+    mat4 view;
+} camera;
+
+layout(set = 1, binding = 2) buffer BLights {
+    SLight lights[];
+};
+
+const float gk[15][15] = float[15][15](
+        float[15](0.00005341, 0.00011457, 0.00022273, 0.00038864, 0.00060837, 0.00085660, 0.00107960, 0.00122143, 0.00107960, 0.00085660, 0.00060837, 0.00038864, 0.00022273, 0.00011457, 0.00005341),
+        float[15](0.00011457, 0.00024574, 0.00047780, 0.00083340, 0.00130483, 0.00183719, 0.00231557, 0.00261963, 0.00231557, 0.00183719, 0.00130483, 0.00083340, 0.00047780, 0.00024574, 0.00011457),
+        float[15](0.00022273, 0.00047780, 0.00092910, 0.00162061, 0.00253669, 0.00357169, 0.00450106, 0.00509276, 0.00450106, 0.00357169, 0.00253669, 0.00162061, 0.00092910, 0.00047780, 0.00022273),
+        float[15](0.00038864, 0.00083340, 0.00162061, 0.00282710, 0.00442545, 0.00623084, 0.00785207, 0.00888213, 0.00785207, 0.00623084, 0.00442545, 0.00282710, 0.00162061, 0.00083340, 0.00038864),
+        float[15](0.00060837, 0.00130483, 0.00253669, 0.00442545, 0.00692687, 0.00975282, 0.01228765, 0.01389902, 0.01228765, 0.00975282, 0.00692687, 0.00442545, 0.00253669, 0.00130483, 0.00060837),
+        float[15](0.00085660, 0.00183719, 0.00357169, 0.00623084, 0.00975282, 0.01373170, 0.01730015, 0.01957541, 0.01730015, 0.01373170, 0.00975282, 0.00623084, 0.00357169, 0.00183719, 0.00085660),
+        float[15](0.00107960, 0.00231557, 0.00450106, 0.00785207, 0.01228765, 0.01730015, 0.02179607, 0.02465771, 0.02179607, 0.01730015, 0.01228765, 0.00785207, 0.00450106, 0.00231557, 0.00107960),
+        float[15](0.00122143, 0.00261963, 0.00509276, 0.00888213, 0.01389902, 0.01957541, 0.02465771, 0.02789510, 0.02465771, 0.01957541, 0.01389902, 0.00888213, 0.00509276, 0.00261963, 0.00122143),
+        float[15](0.00107960, 0.00231557, 0.00450106, 0.00785207, 0.01228765, 0.01730015, 0.02179607, 0.02465771, 0.02179607, 0.01730015, 0.01228765, 0.00785207, 0.00450106, 0.00231557, 0.00107960),
+        float[15](0.00085660, 0.00183719, 0.00357169, 0.00623084, 0.00975282, 0.01373170, 0.01730015, 0.01957541, 0.01730015, 0.01373170, 0.00975282, 0.00623084, 0.00357169, 0.00183719, 0.00085660),
+        float[15](0.00060837, 0.00130483, 0.00253669, 0.00442545, 0.00692687, 0.00975282, 0.01228765, 0.01389902, 0.01228765, 0.00975282, 0.00692687, 0.00442545, 0.00253669, 0.00130483, 0.00060837),
+        float[15](0.00038864, 0.00083340, 0.00162061, 0.00282710, 0.00442545, 0.00623084, 0.00785207, 0.00888213, 0.00785207, 0.00623084, 0.00442545, 0.00282710, 0.00162061, 0.00083340, 0.00038864),
+        float[15](0.00022273, 0.00047780, 0.00092910, 0.00162061, 0.00253669, 0.00357169, 0.00450106, 0.00509276, 0.00450106, 0.00357169, 0.00253669, 0.00162061, 0.00092910, 0.00047780, 0.00022273),
+        float[15](0.00011457, 0.00024574, 0.00047780, 0.00083340, 0.00130483, 0.00183719, 0.00231557, 0.00261963, 0.00231557, 0.00183719, 0.00130483, 0.00083340, 0.00047780, 0.00024574, 0.00011457),
+        float[15](0.00005341, 0.00011457, 0.00022273, 0.00038864, 0.00060837, 0.00085660, 0.00107960, 0.00122143, 0.00107960, 0.00085660, 0.00060837, 0.00038864, 0.00022273, 0.00011457, 0.00005341)
+    );
+
+float linearize_depth(float d, float zNear, float zFar)
+{
+    return zNear * zFar / (zFar + d * (zNear - zFar));
+}
 
 void main()
 {
     ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
-    ivec2 imageSize = imageSize(outputColor);
+    ivec2 imageSize = imageSize(swapchainAttachment);
 
     if (pixelCoords.x >= imageSize.x || pixelCoords.y >= imageSize.y) {
         return;
     }
 
-    vec2 uv = (vec2(pixelCoords) + vec2(0.5)) / vec2(imageSize);
+    vec2 uv = vec2(pixelCoords) / vec2(imageSize);
 
-    vec2 centerUv = vec2(0.5, 0.5);
-    float centerDepth = texture(inputDepth, centerUv).r;
+    float depthValue = linearize_depth(texture(depthAttachment, uv).r, 0.1, 1000.0);
+    float centreDepth = linearize_depth(texture(depthAttachment, vec2(0.5)).r, 0.1, 1000.0);
 
-    // if (length(uv - centerUv) < 0.1)
-    // {
-    //     imageStore(outputColor, pixelCoords, vec4(0.0, 0.0, 0.0, 1.0));
-    //     return;
-    // }
+    vec4 trueColor = imageLoad(colorAttachment, pixelCoords);
 
-    float currentDepth = texture(inputDepth, uv).r;
-    vec4 inColor = imageLoad(inputColor, pixelCoords);
-
-    float depthDifference = abs(currentDepth - centerDepth);
-    vec4 finalColor;
-
-    // --- Apply 8x8 Gaussian Blur ---
-    vec4 blurredColor = vec4(0.0);
-    float totalWeight = 0.0;
-    // Using the hardcoded constant BLUR_SIGMA now
-    float twoSigmaSq = 2.0 * BLUR_SIGMA * BLUR_SIGMA; // Precompute for efficiency
-
-    // Iterate through the 8x8 kernel neighborhood
-    // Loop ranges adjusted for centering an even-sized kernel
-    for (int y = -KERNEL_RADIUS + 1; y <= KERNEL_RADIUS; ++y) {
-        for (int x = -KERNEL_RADIUS + 1; x <= KERNEL_RADIUS; ++x) {
-            // Calculate coordinates of the neighboring pixel to sample
-            ivec2 sampleCoords = pixelCoords + ivec2(x, y);
-
-            // Clamp coordinates to stay within image bounds
-            // Important when using imageLoad to prevent out-of-bounds access
-            sampleCoords = clamp(sampleCoords, ivec2(0), imageSize - 1);
-
-            // Calculate Gaussian weight for this neighbor
-            // Weight decreases exponentially with distance from the center pixel (x=0, y=0)
-            float distSq = float(x * x + y * y);
-            float weight = exp(-distSq / twoSigmaSq);
-
-            // Load neighbor's color using imageLoad (required for image2D)
-            vec4 sampleColor = imageLoad(inputColor, sampleCoords);
-
-            // Accumulate weighted color and total weight
-            blurredColor += sampleColor * weight;
-            totalWeight += weight;
+    vec4 accumulatedColor = vec4(0.0);
+    // if (abs(depthValue - centreDepth) < 0.1)
+    if (true)
+    {
+        accumulatedColor = trueColor;
+    }
+    else
+    {
+        for (int x = -7; x <= 7; ++x)
+        {
+            for (int y = -7; y <= 7; ++y)
+            {
+                accumulatedColor += imageLoad(colorAttachment, pixelCoords + ivec2(x, y)) * gk[x + 7][y + 7];
+            }
         }
+
+        accumulatedColor.w = 1.0;
     }
 
-    // Normalize the blurred color by dividing by the total weight
-    // Avoid division by zero if totalWeight is somehow zero
-    if (totalWeight > 0.0) {
-        finalColor = blurredColor / totalWeight;
-    } else {
-        finalColor = inColor; // Fallback to original color
-    }
-
-    // Write the final color (either original or blurred) to the output image
-    imageStore(outputColor, pixelCoords, finalColor);
+    imageStore(swapchainAttachment, pixelCoords, accumulatedColor);
 }

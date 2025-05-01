@@ -32,7 +32,7 @@ namespace letc
         dl.m_name = name;
         dl.m_binding = binding;
         dl.m_type = type;
-        dl.m_stages = stages;
+        dl.m_stages = stages | vk::ShaderStageFlagBits::eCompute;
         dl.m_count = count;
         dl.m_samplers = samplers;
         m_descriptors.push_back(dl);

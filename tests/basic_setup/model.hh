@@ -227,7 +227,9 @@ auto loadNode(std::vector<Model> &loadedModels, const tinygltf::Model &gltfModel
 
         model.ds = layout.lock()->build(pool);
         model.ds->attachBuffer("UModel", model.uniform.get(), sizeof(Model::Uniform));
-
+        model.uniform->model = currentTransform;
+        model.uniform->modelIT = glm::inverseTranspose(currentTransform);
+    
         // Example: Accessing index data (assuming unsigned short indices)
         /*
         if (baseIndexPtr && indexComponentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {

@@ -34,6 +34,6 @@ layout(location = 1) out vec4 vNormal;
 void main()
 {
     vPosition = model.model * vec4(aPosition, 1.0);
-    vNormal = model.model * vec4(aNormal, 1.0);
+    vNormal = model.model_inv_t * vec4(aNormal, 1.0);
     gl_Position = camera.proj * camera.view * vPosition;
 }

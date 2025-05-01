@@ -23,7 +23,7 @@
                 }
             ]
         },
-        "_43" : {
+        "_44" : {
             "name" : "gl_PerVertex",
             "members" : [
                 {
@@ -56,7 +56,7 @@
                 }
             ]
         },
-        "_46" : {
+        "_47" : {
             "name" : "UCamera",
             "members" : [
                 {
@@ -163,7 +163,7 @@
             "binding" : 0
         },
         {
-            "type" : "_46",
+            "type" : "_47",
             "name" : "UCamera",
             "block_size" : 128,
             "set" : 0,

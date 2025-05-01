@@ -6,7 +6,39 @@
         }
     ],
     "types" : {
-        "_26" : {
+        "_27" : {
+            "name" : "SLight",
+            "members" : [
+                {
+                    "name" : "position",
+                    "type" : "vec4",
+                    "offset" : 0
+                },
+                {
+                    "name" : "color",
+                    "type" : "vec4",
+                    "offset" : 16
+                }
+            ]
+        },
+        "_29" : {
+            "name" : "BLights",
+            "members" : [
+                {
+                    "name" : "lights",
+                    "type" : "_27",
+                    "array" : [
+                        0
+                    ],
+                    "array_size_is_literal" : [
+                        true
+                    ],
+                    "offset" : 0,
+                    "array_stride" : 32
+                }
+            ]
+        },
+        "_101" : {
             "name" : "UFrameData",
             "members" : [
                 {
@@ -21,7 +53,7 @@
                 }
             ]
         },
-        "_30" : {
+        "_105" : {
             "name" : "UCamera",
             "members" : [
                 {
@@ -38,39 +70,7 @@
                 }
             ]
         },
-        "_33" : {
-            "name" : "SLight",
-            "members" : [
-                {
-                    "name" : "position",
-                    "type" : "vec4",
-                    "offset" : 0
-                },
-                {
-                    "name" : "color",
-                    "type" : "vec4",
-                    "offset" : 16
-                }
-            ]
-        },
-        "_35" : {
-            "name" : "BLights",
-            "members" : [
-                {
-                    "name" : "lights",
-                    "type" : "_33",
-                    "array" : [
-                        0
-                    ],
-                    "array_size_is_literal" : [
-                        true
-                    ],
-                    "offset" : 0,
-                    "array_stride" : 32
-                }
-            ]
-        },
-        "_38" : {
+        "_108" : {
             "name" : "UModel",
             "members" : [
                 {
@@ -91,13 +91,13 @@
     "inputs" : [
         {
             "type" : "vec4",
-            "name" : "vNormal",
-            "location" : 1
+            "name" : "vPosition",
+            "location" : 0
         },
         {
             "type" : "vec4",
-            "name" : "vPosition",
-            "location" : 0
+            "name" : "vNormal",
+            "location" : 1
         }
     ],
     "outputs" : [
@@ -109,7 +109,7 @@
     ],
     "ssbos" : [
         {
-            "type" : "_35",
+            "type" : "_29",
             "name" : "BLights",
             "block_size" : 0,
             "set" : 0,
@@ -118,21 +118,21 @@
     ],
     "ubos" : [
         {
-            "type" : "_26",
+            "type" : "_101",
             "name" : "UFrameData",
             "block_size" : 8,
             "set" : 0,
             "binding" : 0
         },
         {
-            "type" : "_30",
+            "type" : "_105",
             "name" : "UCamera",
             "block_size" : 128,
             "set" : 0,
             "binding" : 1
         },
         {
-            "type" : "_38",
+            "type" : "_108",
             "name" : "UModel",
             "block_size" : 128,
             "set" : 1,

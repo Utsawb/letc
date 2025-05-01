@@ -77,13 +77,47 @@ auto main(int argc, char *argv[]) -> int
                            })
                            .build(device);
 
+    auto frameBuffer =
+        letc::ObjectBuffer<FrameData>(allocator, vk::BufferUsageFlagBits::eUniformBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    frameBuffer->frame = 0;
+    frameBuffer->time = 0.0f;
+
+    std::println("Width: {}, Height: {}, Aspect: {}", extent.width, extent.height,
+                 (float)extent.width / (float)extent.height);
+    auto camera = letc::FirstPersonCamera(allocator, (float)extent.width / (float)extent.height, glm::radians(60.0f),
+                                          0.1f, 1000.0f, {0.0f, 1.0f, 5.0f});
+
+    auto lights = letc::VectorBuffer<LightData>(allocator, 4, vk::BufferUsageFlagBits::eStorageBuffer,
+                                                VMA_MEMORY_USAGE_CPU_TO_GPU);
+    lights->at(0) = {{0.0f, 0.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}};
+    // lights->at(0) = {{-5.0f, 5.0f, -5.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}};
+    // lights->at(1) = {{5.0f, 5.0f, -5.0f, 1.0f}, {1.0f, 0.0f, 0.0f, 10.0f}};
+    // lights->at(2) = {{-5.0f, 5.0f, 5.0f, 1.0f}, {0.0f, 1.0f, 0.0f, 10.0f}};
+    // lights->at(3) = {{5.0f, 5.0f, 5.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 10.0f}};
+
+    auto frameSetLayout = std::make_shared<letc::DescriptorSetLayout>(pbrPipeline->getSetLayouts().at(0));
+    std::vector<std::shared_ptr<letc::DescriptorSet>> frameSets;
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+    {
+        auto fs = frameSetLayout->build(descPool);
+        fs->attachBuffer("UFrameData", frameBuffer.get(), frameBuffer.containedSize());
+        fs->attachBuffer("UCamera", camera.getBuffer(), camera.containedSize());
+        fs->attachBuffer("BLights", lights.get(), lights.containedSize());
+        frameSets.push_back(fs);
+    }
+
+    auto modelLayout = std::make_shared<letc::DescriptorSetLayout>(pbrPipeline->getSetLayouts().at(1));
+    auto models = loadModels(resourcePath / "models" / "sponza" / "Sponza.gltf", modelLayout, descPool, allocator);
+
     shaderManager.add(resourcePath / "shaders" / "dof" / "compute.spirv", "main");
     auto postProcessCompute = shaderManager.getShader(resourcePath / "shaders" / "dof" / "compute.spirv", "main");
     auto computeSetLayoutInfo = postProcessCompute.getLayouts().at(0);
     vk::UniqueDescriptorSetLayout computeSetLayout = computeSetLayoutInfo.build(device);
+    auto fs = frameSetLayout->build(device);
+    auto computeSetLayouts = {*computeSetLayout, *fs};
 
     vk::PipelineLayoutCreateInfo computePipelineLayoutInfo{};
-    computePipelineLayoutInfo.setSetLayouts(*computeSetLayout);
+    computePipelineLayoutInfo.setSetLayouts(computeSetLayouts);
     vk::UniquePipelineLayout computePipelineLayout =
         device->getLogical().createPipelineLayoutUnique(computePipelineLayoutInfo);
 
@@ -179,36 +213,6 @@ auto main(int argc, char *argv[]) -> int
         offscreenColorImageViews.push_back(std::make_shared<letc::ImageView>(device, colorImageViewCreateInfo));
     }
 
-    auto frameBuffer =
-        letc::ObjectBuffer<FrameData>(allocator, vk::BufferUsageFlagBits::eUniformBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    frameBuffer->frame = 0;
-    frameBuffer->time = 0.0f;
-
-    std::println("Width: {}, Height: {}, Aspect: {}", extent.width, extent.height,
-                 (float)extent.width / (float)extent.height);
-    auto camera = letc::FirstPersonCamera(allocator, (float)extent.width / (float)extent.height, glm::radians(60.0f),
-                                          0.1f, 100000.0f, {0.0f, 1.0f, 5.0f});
-
-    auto lights = letc::VectorBuffer<LightData>(allocator, 4, vk::BufferUsageFlagBits::eStorageBuffer,
-                                                VMA_MEMORY_USAGE_CPU_TO_GPU);
-    lights->at(0) = {{-5.0f, 5.0f, -5.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 10.0f}};
-    lights->at(1) = {{5.0f, 5.0f, -5.0f, 1.0f}, {1.0f, 0.0f, 0.0f, 10.0f}};
-    lights->at(2) = {{-5.0f, 5.0f, 5.0f, 1.0f}, {0.0f, 1.0f, 0.0f, 10.0f}};
-    lights->at(3) = {{5.0f, 5.0f, 5.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 10.0f}};
-
-    auto frameSetLayout = std::make_shared<letc::DescriptorSetLayout>(pbrPipeline->getSetLayouts().at(0));
-    std::vector<std::shared_ptr<letc::DescriptorSet>> frameSets;
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
-    {
-        auto fs = frameSetLayout->build(descPool);
-        fs->attachBuffer("UFrameData", frameBuffer.get(), frameBuffer.containedSize());
-        fs->attachBuffer("UCamera", camera.getBuffer(), camera.containedSize());
-        fs->attachBuffer("BLights", lights.get(), lights.containedSize());
-        frameSets.push_back(fs);
-    }
-
-    auto modelLayout = std::make_shared<letc::DescriptorSetLayout>(pbrPipeline->getSetLayouts().at(1));
-    auto models = loadModels(resourcePath / "models" / "sponza" / "Sponza.gltf", modelLayout, descPool, allocator);
     uint32_t currentFrame = 0;
     auto startTime = std::chrono::high_resolution_clock::now();
 
@@ -426,8 +430,11 @@ auto main(int argc, char *argv[]) -> int
         cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *computePipelineLayout, 0, 1,
                                &(*computeDescriptorSets[currentFrame]), 0, nullptr);
 
-        uint32_t groupCountX = (extent.width / 32);
-        uint32_t groupCountY = (extent.height / 32);
+        cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *computePipelineLayout, 1, 1,
+                               &frameSets[currentFrame]->get(), 0, nullptr);
+
+        uint32_t groupCountX = (extent.width / 16);
+        uint32_t groupCountY = (extent.height / 16);
         cmd.dispatch(groupCountX, groupCountY, 1);
 
         // --- Barrier Before Blit ---
