@@ -29,10 +29,8 @@ namespace letc
                                    vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA)
                 .setBlendEnable(VK_FALSE));
 
-        // Sensible defaults - often overridden
-        m_renderingInfo.setColorAttachmentCount(1); // Assuming one color attachment by default
-        // m_renderingInfo.setPColorAttachmentFormats(...); // Needs format info, set via callback or later
-        m_renderingInfo.setDepthAttachmentFormat(vk::Format::eD32Sfloat); // Common default
+        m_renderingInfo.setColorAttachmentCount(1);
+        m_renderingInfo.setDepthAttachmentFormat(vk::Format::eD32Sfloat);
 
         m_depthStencilInfo.setDepthTestEnable(VK_TRUE);
         m_depthStencilInfo.setDepthWriteEnable(VK_TRUE);
@@ -40,14 +38,11 @@ namespace letc
         m_depthStencilInfo.setDepthBoundsTestEnable(VK_FALSE);
         m_depthStencilInfo.setStencilTestEnable(VK_FALSE);
 
-        // Dynamic states often include viewport and scissor
         m_dynamicStates.push_back(vk::DynamicState::eViewport);
         m_dynamicStates.push_back(vk::DynamicState::eScissor);
 
-        // Default tessellation state (no tessellation)
         m_tessellationInfo = vk::PipelineTessellationStateCreateInfo{};
 
-        // Default dynamic state info (will be updated in build)
         m_dynamicStateInfo = vk::PipelineDynamicStateCreateInfo{};
     }
 
@@ -131,8 +126,6 @@ namespace letc
 
     auto GraphicsPipelineBuilder::setColorBlend(ColorBlendCallback func) -> GraphicsPipelineBuilder &
     {
-        // The callback modifies the main ColorBlendStateCreateInfo.
-        // Attachments are still managed separately via add/clear methods.
         func(m_colorBlendInfo);
         return *this;
     }
@@ -155,14 +148,6 @@ namespace letc
         return *this;
     }
 
-    /* // Optional: Callback for the main dynamic state struct
-    auto GraphicsPipelineBuilder::setDynamicState(DynamicStateCallback func) -> GraphicsPipelineBuilder& {
-        func(m_dynamicStateInfo);
-        return *this;
-    }
-    */
-
-    // --- Build Implementation (largely unchanged, but uses the modified internal structs) ---
     auto GraphicsPipelineBuilder::build(std::weak_ptr<Device> device_weak) const -> std::shared_ptr<GraphicsPipeline>
     {
         auto device = device_weak.lock();
@@ -201,56 +186,40 @@ namespace letc
         vk::PipelineLayout pipelineLayout = device->getLogical().createPipelineLayout(pipelineLayoutInfo);
         ATHROW(pipelineLayout, "Failed to create pipeline layout");
 
-        // --- Prepare State Create Infos (using potentially modified member structs) ---
-
-        // Vertex Input (binding/attributes added separately)
-        vk::PipelineVertexInputStateCreateInfo vertexInputInfo = m_vertexInputInfo; // Start with defaults if any
+        vk::PipelineVertexInputStateCreateInfo vertexInputInfo = m_vertexInputInfo;
         vertexInputInfo.setVertexBindingDescriptions(m_vertexBinding);
         vertexInputInfo.setVertexAttributeDescriptions(m_vertexAttribute);
 
-        // Color Blend (attachments added separately)
-        vk::PipelineColorBlendStateCreateInfo colorBlendInfo =
-            m_colorBlendInfo;                                   // Uses the (potentially modified) member
-        colorBlendInfo.setAttachments(m_colorBlendAttachments); // Set attachments managed separately
+        vk::PipelineColorBlendStateCreateInfo colorBlendInfo = m_colorBlendInfo;
+        colorBlendInfo.setAttachments(m_colorBlendAttachments);
 
-        // Dynamic State (states added separately)
-        // Use a const_cast ONLY if absolutely necessary and safe. It's generally better
-        // to make build() non-const if it needs to modify members temporarily for setup.
-        // However, for setting the pDynamicStates pointer, it's common practice here.
-        vk::PipelineDynamicStateCreateInfo dynamicStateInfo =
-            m_dynamicStateInfo;                             // Uses the (potentially modified) member
-        dynamicStateInfo.setDynamicStates(m_dynamicStates); // Set states managed separately
+        vk::PipelineDynamicStateCreateInfo dynamicStateInfo = m_dynamicStateInfo;
+        dynamicStateInfo.setDynamicStates(m_dynamicStates);
 
-        // --- Graphics Pipeline Create Info ---
         vk::GraphicsPipelineCreateInfo pipelineInfo{};
         pipelineInfo.setFlags(m_createFlags);
         pipelineInfo.setStages(shaderStageInfos);
         pipelineInfo.setPVertexInputState(&vertexInputInfo);
-        pipelineInfo.setPInputAssemblyState(&m_inputAssemblyInfo); // Use member directly
-        pipelineInfo.setPTessellationState(&m_tessellationInfo);   // Use member directly
-        pipelineInfo.setPViewportState(&m_viewportInfo);           // Use member directly
-        pipelineInfo.setPRasterizationState(&m_rasterizationInfo); // Use member directly
-        pipelineInfo.setPMultisampleState(&m_multisampleInfo);     // Use member directly
-        pipelineInfo.setPDepthStencilState(&m_depthStencilInfo);   // Use member directly
-        pipelineInfo.setPColorBlendState(&colorBlendInfo);         // Use locally prepared struct
-        pipelineInfo.setPDynamicState(&dynamicStateInfo);          // Use locally prepared struct
+        pipelineInfo.setPInputAssemblyState(&m_inputAssemblyInfo);
+        pipelineInfo.setPTessellationState(&m_tessellationInfo);
+        pipelineInfo.setPViewportState(&m_viewportInfo);
+        pipelineInfo.setPRasterizationState(&m_rasterizationInfo);
+        pipelineInfo.setPMultisampleState(&m_multisampleInfo);
+        pipelineInfo.setPDepthStencilState(&m_depthStencilInfo);
+        pipelineInfo.setPColorBlendState(&colorBlendInfo);
+        pipelineInfo.setPDynamicState(&dynamicStateInfo);
         pipelineInfo.setLayout(pipelineLayout);
 
-        // Dynamic Rendering setup
-        // Use a const_cast ONLY if absolutely necessary and safe.
-        // See comment above for dynamicStateInfo.
-        vk::PipelineRenderingCreateInfo renderingInfo = m_renderingInfo; // Use member directly
+        vk::PipelineRenderingCreateInfo renderingInfo = m_renderingInfo; 
         pipelineInfo.setPNext(&renderingInfo);
-        pipelineInfo.setRenderPass(VK_NULL_HANDLE); // Explicitly null for dynamic rendering
-        pipelineInfo.setSubpass(0);                 // Subpass index is 0 for dynamic rendering
+        pipelineInfo.setRenderPass(VK_NULL_HANDLE); 
+        pipelineInfo.setSubpass(0);              
 
-        // --- Create Pipeline ---
         auto result = device->getLogical().createGraphicsPipeline(VK_NULL_HANDLE, pipelineInfo);
         ATHROW(result.result == vk::Result::eSuccess, "Failed to create graphics pipeline");
         vk::Pipeline pipeline = result.value;
 
-        // --- Create and Return Shared Pointer ---
-        auto graphicsPipeline = std::shared_ptr<GraphicsPipeline>(new GraphicsPipeline()); // Use private constructor
+        auto graphicsPipeline = std::shared_ptr<GraphicsPipeline>(new GraphicsPipeline()); 
 
         graphicsPipeline->m_device = device_weak;
         graphicsPipeline->m_layout = pipelineLayout;

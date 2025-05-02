@@ -177,12 +177,12 @@ namespace letc
     auto DescriptorSet::attachImage(const uint32_t &binding, const vk::ImageView &view, const vk::Sampler &sampler,
                                     const vk::ImageLayout layout) -> DescriptorSet &
     {
-
+        // not enough time to implement this, would really be nice to have though
         return *this;
     }
     auto DescriptorSet::attachTexelBuffer(const uint32_t &binding, const vk::BufferView &view) -> DescriptorSet &
     {
-
+        // not enough time to implement this, would really be nice to have though
         return *this;
     }
 

@@ -9,7 +9,7 @@ const uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 struct FrameData
 {
     float time;
-    uint32_t frame; // Use uint32_t for frame count
+    float frame;
 };
 
 struct LightData
@@ -89,10 +89,6 @@ auto main(int argc, char *argv[]) -> int
     auto lights = letc::VectorBuffer<LightData>(allocator, 4, vk::BufferUsageFlagBits::eStorageBuffer,
                                                 VMA_MEMORY_USAGE_CPU_TO_GPU);
     lights->at(0) = {{0.0f, 0.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}};
-    // lights->at(0) = {{-5.0f, 5.0f, -5.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}};
-    // lights->at(1) = {{5.0f, 5.0f, -5.0f, 1.0f}, {1.0f, 0.0f, 0.0f, 10.0f}};
-    // lights->at(2) = {{-5.0f, 5.0f, 5.0f, 1.0f}, {0.0f, 1.0f, 0.0f, 10.0f}};
-    // lights->at(3) = {{5.0f, 5.0f, 5.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 10.0f}};
 
     auto frameSetLayout = std::make_shared<letc::DescriptorSetLayout>(pbrPipeline->getSetLayouts().at(0));
     std::vector<std::shared_ptr<letc::DescriptorSet>> frameSets;
@@ -167,7 +163,6 @@ auto main(int argc, char *argv[]) -> int
                                                      .setBorderColor(vk::BorderColor::eFloatOpaqueBlack)
                                                      .setUnnormalizedCoordinates(VK_FALSE));
 
-    // --- Per-Frame Resources ---
     std::vector<vk::UniqueCommandBuffer> commandBuffers;
     std::vector<vk::UniqueSemaphore> imageAvailableSemaphores;
     std::vector<vk::UniqueSemaphore> renderFinishedSemaphores;
@@ -176,6 +171,8 @@ auto main(int argc, char *argv[]) -> int
     std::vector<std::shared_ptr<letc::ImageView>> depthImageViews;
     std::vector<std::shared_ptr<letc::Image>> offscreenColorImages;
     std::vector<std::shared_ptr<letc::ImageView>> offscreenColorImageViews;
+    std::vector<std::shared_ptr<letc::Image>> computeOutputImages;
+    std::vector<std::shared_ptr<letc::ImageView>> computeOutputImageViews;
 
     commandBuffers =
         device->getLogical().allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo{}
@@ -217,6 +214,32 @@ auto main(int argc, char *argv[]) -> int
                                                                      .setLevelCount(1)
                                                                      .setLayerCount(1));
         offscreenColorImageViews.push_back(std::make_shared<letc::ImageView>(device, colorImageViewCreateInfo));
+
+        auto computeOutputImageCreateInfo =
+            vk::ImageCreateInfo{}
+                .setImageType(vk::ImageType::e2D)
+                .setFormat(vk::Format::eR8G8B8A8Unorm)
+                .setExtent({extent.width, extent.height, 1})
+                .setMipLevels(1)
+                .setArrayLayers(1)
+                .setSamples(vk::SampleCountFlagBits::e1)
+                .setTiling(vk::ImageTiling::eOptimal)
+                .setUsage(vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eTransferSrc)
+                .setInitialLayout(vk::ImageLayout::eUndefined);
+
+        computeOutputImages.push_back(
+            std::make_shared<letc::Image>(allocator, computeOutputImageCreateInfo, VMA_MEMORY_USAGE_GPU_ONLY));
+
+        auto computeOutputImageViewCreateInfo =
+            vk::ImageViewCreateInfo{}
+                .setImage(computeOutputImages[i]->get())
+                .setViewType(vk::ImageViewType::e2D)
+                .setFormat(computeOutputImageCreateInfo.format)
+                .setSubresourceRange(vk::ImageSubresourceRange{}
+                                         .setAspectMask(vk::ImageAspectFlagBits::eColor)
+                                         .setLevelCount(1)
+                                         .setLayerCount(1));
+        computeOutputImageViews.push_back(std::make_shared<letc::ImageView>(device, computeOutputImageViewCreateInfo));
     }
 
     uint32_t currentFrame = 0;
@@ -384,23 +407,18 @@ auto main(int argc, char *argv[]) -> int
             vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eComputeShader);
 
         letc::laconic::transitionImageLayout(
-            cmd, depthImages[currentFrame],
-            vk::ImageAspectFlagBits::eDepth, // CORRECT for D32_SFLOAT
-            vk::ImageLayout::eDepthAttachmentOptimal,
-            // --> CHANGED: Optimal layout for sampling
+            cmd, depthImages[currentFrame], vk::ImageAspectFlagBits::eDepth, vk::ImageLayout::eDepthAttachmentOptimal,
             vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-            // --> CHANGED: Read access for shader sampling
             vk::AccessFlagBits::eShaderRead, vk::PipelineStageFlagBits::eLateFragmentTests,
             vk::PipelineStageFlagBits::eComputeShader);
 
-        letc::laconic::transitionImageLayout(cmd, swapchain->getImages()[imageIndex], vk::ImageAspectFlagBits::eColor,
+        letc::laconic::transitionImageLayout(cmd, computeOutputImages[currentFrame], vk::ImageAspectFlagBits::eColor,
                                              vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, {},
                                              vk::AccessFlagBits::eShaderWrite, vk::PipelineStageFlagBits::eTopOfPipe,
                                              vk::PipelineStageFlagBits::eComputeShader);
 
         std::vector<vk::WriteDescriptorSet> computeWrites;
 
-        // Input Color (Binding 0) - Storage Image (or Sampled)
         vk::DescriptorImageInfo colorInputInfo{};
         colorInputInfo.setImageView(offscreenColorImageViews[currentFrame]->get());
         colorInputInfo.setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
@@ -424,7 +442,7 @@ auto main(int argc, char *argv[]) -> int
                                     .setImageInfo(depthInputInfo));
 
         vk::DescriptorImageInfo computeOutputInfo{};
-        computeOutputInfo.setImageView(offscreenColorImageViews[currentFrame]->get());
+        computeOutputInfo.setImageView(computeOutputImageViews[currentFrame]->get());
         computeOutputInfo.setImageLayout(vk::ImageLayout::eGeneral);
         computeWrites.push_back(vk::WriteDescriptorSet{}
                                     .setDstSet(*computeDescriptorSets[currentFrame])
@@ -434,7 +452,6 @@ auto main(int argc, char *argv[]) -> int
                                     .setImageInfo(computeOutputInfo));
 
         device->getLogical().updateDescriptorSets(computeWrites, nullptr);
-
         cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *computePipeline);
         cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *computePipelineLayout, 0, 1,
                                &(*computeDescriptorSets[currentFrame]), 0, nullptr);
@@ -446,56 +463,36 @@ auto main(int argc, char *argv[]) -> int
         uint32_t groupCountY = (extent.height / 16);
         cmd.dispatch(groupCountX, groupCountY, 1);
 
-        // --- Barrier Before Blit ---
+        letc::laconic::transitionImageLayout(
+            cmd, computeOutputImages[currentFrame], vk::ImageAspectFlagBits::eColor, vk::ImageLayout::eGeneral,
+            vk::ImageLayout::eTransferSrcOptimal, vk::AccessFlagBits::eShaderWrite, vk::AccessFlagBits::eTransferRead,
+            vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eTransfer);
 
-        // Transition Offscreen image (Compute Output) to Transfer Source
-        letc::laconic::transitionImageLayout(cmd, offscreenColorImages[currentFrame], vk::ImageAspectFlagBits::eColor,
-                                             vk::ImageLayout::eGeneral,            // From compute write
-                                             vk::ImageLayout::eTransferSrcOptimal, // To blit source
-                                             vk::AccessFlagBits::eShaderWrite,     // Wait for compute write
-                                             vk::AccessFlagBits::eTransferRead,    // Read access for blit
-                                             vk::PipelineStageFlagBits::eComputeShader,
-                                             vk::PipelineStageFlagBits::eTransfer);
-
-        // Transition Swapchain image to Transfer Destination
         letc::laconic::transitionImageLayout(cmd, swapchain->getImages()[imageIndex], vk::ImageAspectFlagBits::eColor,
-                                             vk::ImageLayout::eUndefined,           // Current layout (after acquire)
-                                             vk::ImageLayout::eTransferDstOptimal,  // To blit destination
-                                             {},                                    // No prior access needed
-                                             vk::AccessFlagBits::eTransferWrite,    // Write access for blit
-                                             vk::PipelineStageFlagBits::eTopOfPipe, // Can start early
+                                             vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, {},
+                                             vk::AccessFlagBits::eTransferWrite, vk::PipelineStageFlagBits::eTopOfPipe,
                                              vk::PipelineStageFlagBits::eTransfer);
 
-        // --- Blit Image Command ---
         vk::ImageBlit blitRegion{};
         blitRegion.srcSubresource.setAspectMask(vk::ImageAspectFlagBits::eColor);
         blitRegion.srcSubresource.setLayerCount(1);
-        blitRegion.srcOffsets[1] = vk::Offset3D{static_cast<int32_t>(extent.width), static_cast<int32_t>(extent.height),
-                                                1}; // Source region extent
+        blitRegion.srcOffsets[1] =
+            vk::Offset3D{static_cast<int32_t>(extent.width), static_cast<int32_t>(extent.height), 1};
         blitRegion.dstSubresource.setAspectMask(vk::ImageAspectFlagBits::eColor);
         blitRegion.dstSubresource.setLayerCount(1);
-        blitRegion.dstOffsets[1] = vk::Offset3D{static_cast<int32_t>(extent.width), static_cast<int32_t>(extent.height),
-                                                1}; // Destination region extent
+        blitRegion.dstOffsets[1] =
+            vk::Offset3D{static_cast<int32_t>(extent.width), static_cast<int32_t>(extent.height), 1};
 
-        cmd.blitImage(offscreenColorImages[currentFrame]->get(), vk::ImageLayout::eTransferSrcOptimal,
+        cmd.blitImage(computeOutputImages[currentFrame]->get(), vk::ImageLayout::eTransferSrcOptimal,
                       swapchain->getImages()[imageIndex], vk::ImageLayout::eTransferDstOptimal, 1, &blitRegion,
-                      vk::Filter::eNearest // Or vk::Filter::eLinear if supported and desired
-        );
+                      vk::Filter::eNearest);
 
-        // --- Barrier Before Present ---
+        letc::laconic::transitionImageLayout(
+            cmd, swapchain->getImages()[imageIndex], vk::ImageAspectFlagBits::eColor,
+            vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::ePresentSrcKHR, vk::AccessFlagBits::eTransferWrite,
+            {}, vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eBottomOfPipe);
 
-        // Transition Swapchain Image from Transfer Dst to PresentSrc
-        letc::laconic::transitionImageLayout(cmd, swapchain->getImages()[imageIndex], vk::ImageAspectFlagBits::eColor,
-                                             vk::ImageLayout::eTransferDstOptimal, // From blit write
-                                             vk::ImageLayout::ePresentSrcKHR,      // To present
-                                             vk::AccessFlagBits::eTransferWrite,   // Wait for blit write
-                                             {},                                   // No subsequent access needed
-                                             vk::PipelineStageFlagBits::eTransfer,
-                                             vk::PipelineStageFlagBits::eBottomOfPipe);
-
-        // --- End Command Buffer and Submit (Existing) ---
         cmd.end();
-        // ... submit and present ...
 
         vk::Semaphore waitSemaphores[] = {*imageAvailableSemaphores[currentFrame]};
         vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};

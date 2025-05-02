@@ -27,12 +27,10 @@ namespace letc
         auto surface = window.lock()->createSurface(instance);
         auto surfaceCapabilites = device.lock()->getPhysical().getSurfaceCapabilitiesKHR(surface);
 
-        // --> ADDED: Query and Select Surface Format
         auto surfaceFormats = device.lock()->getPhysical().getSurfaceFormatsKHR(surface);
-        vk::SurfaceFormatKHR selectedFormat = surfaceFormats[0]; // Default to first
+        vk::SurfaceFormatKHR selectedFormat = surfaceFormats[0];
         for (const auto &availableFormat : surfaceFormats)
         {
-            // Prefer B8G8R8A8_SRGB or R8G8B8A8_SRGB if available
             if (availableFormat.format == vk::Format::eB8G8R8A8Srgb &&
                 availableFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
             {
@@ -43,10 +41,9 @@ namespace letc
                 availableFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
             {
                 selectedFormat = availableFormat;
-                // Don't break, maybe BGR is preferred
             }
         }
-        m_format = selectedFormat; // Store the selected format
+        m_format = selectedFormat;
 
         auto swapchainInfo =
             vk::SwapchainCreateInfoKHR{}

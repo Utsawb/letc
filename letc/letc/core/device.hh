@@ -4,6 +4,8 @@
 
 #include "letc/core/instance.hh"
 
+// forced myself to comment this out properly so I did not work on it any longer
+// such a waste of time man
 namespace letc
 {
     class Device;

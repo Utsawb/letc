@@ -22,9 +22,6 @@ namespace letc
         using ColorBlendCallback = std::function<void(vk::PipelineColorBlendStateCreateInfo &)>;
         using RenderingCallback = std::function<void(vk::PipelineRenderingCreateInfo &)>;
         using DynamicStateCallback = std::function<void(vk::PipelineDynamicStateCreateInfo &)>;
-        // Note: For color blend attachments and dynamic states (vectors), alternative callback approaches might be
-        // needed if fine-grained control over adding/removing individual elements is desired via callback. This
-        // implementation focuses on modifying the main state structs.
 
         GraphicsPipelineBuilder();
 
@@ -48,8 +45,6 @@ namespace letc
         auto setRendering(RenderingCallback func) -> GraphicsPipelineBuilder &;
         auto clearDynamicStates() -> GraphicsPipelineBuilder &;
         auto addDynamicState(const vk::DynamicState &state) -> GraphicsPipelineBuilder &;
-        // auto setDynamicState(DynamicStateCallback func) -> GraphicsPipelineBuilder &; // Optional: Callback for the
-        // main struct
 
         auto build(std::weak_ptr<Device> device) const -> std::shared_ptr<GraphicsPipeline>;
 
@@ -58,7 +53,6 @@ namespace letc
         std::vector<vk::VertexInputBindingDescription> m_vertexBinding;
         std::vector<vk::VertexInputAttributeDescription> m_vertexAttribute;
 
-        // Internal state structs
         vk::PipelineVertexInputStateCreateInfo m_vertexInputInfo;
         vk::PipelineInputAssemblyStateCreateInfo m_inputAssemblyInfo;
         vk::PipelineTessellationStateCreateInfo m_tessellationInfo;
@@ -67,10 +61,10 @@ namespace letc
         vk::PipelineMultisampleStateCreateInfo m_multisampleInfo;
         vk::PipelineDepthStencilStateCreateInfo m_depthStencilInfo;
         vk::PipelineColorBlendStateCreateInfo m_colorBlendInfo;
-        std::vector<vk::PipelineColorBlendAttachmentState> m_colorBlendAttachments; // Keep vector separate for now
+        std::vector<vk::PipelineColorBlendAttachmentState> m_colorBlendAttachments;
         vk::PipelineRenderingCreateInfo m_renderingInfo;
-        vk::PipelineDynamicStateCreateInfo m_dynamicStateInfo; // Keep separate for now
-        std::vector<vk::DynamicState> m_dynamicStates;         // Keep vector separate for now
+        vk::PipelineDynamicStateCreateInfo m_dynamicStateInfo;
+        std::vector<vk::DynamicState> m_dynamicStates;
         vk::PipelineCreateFlags m_createFlags;
     };
 

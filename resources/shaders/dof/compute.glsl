@@ -44,9 +44,17 @@ const float gk[15][15] = float[15][15](
         float[15](0.00005341, 0.00011457, 0.00022273, 0.00038864, 0.00060837, 0.00085660, 0.00107960, 0.00122143, 0.00107960, 0.00085660, 0.00060837, 0.00038864, 0.00022273, 0.00011457, 0.00005341)
     );
 
-float linearize_depth(float d, float zNear, float zFar)
+const float baseMinFocusFactor = 0.01;
+const float baseMaxFocusFactor = 0.10;
+const float absoluteMinDiffThreshold = 0.02;
+const float absoluteMaxDiffThreshold = 0.05;
+const float minFocusRangeWidth = 0.01;
+const float zNear = 0.1;
+const float zFar = 1000.0;
+
+float linearize_depth(float d, float near, float far)
 {
-    return zNear * zFar / (zFar + d * (zNear - zFar));
+    return near * far / (far + d * (near - far));
 }
 
 void main()
@@ -59,29 +67,42 @@ void main()
     }
 
     vec2 uv = vec2(pixelCoords) / vec2(imageSize);
-
-    float depthValue = linearize_depth(texture(depthAttachment, uv).r, 0.1, 1000.0);
-    float centreDepth = linearize_depth(texture(depthAttachment, vec2(0.5)).r, 0.1, 1000.0);
-
-    vec4 trueColor = texture(colorAttachment, uv);
-
-    vec4 accumulatedColor = vec4(0.0);
-    if (abs(depthValue - centreDepth) < 0.1)
+    vec2 texelSize = 1.0 / vec2(imageSize);
+    if (uv == vec2(0.5))
     {
-        accumulatedColor = trueColor;
+        imageStore(swapchainAttachment, pixelCoords, vec4(0.0));
+        return;
     }
-    else
+
+    float rawDepth = texture(depthAttachment, uv).r;
+    float depthValue = (rawDepth >= 1.0) ? zFar * 10.0 : linearize_depth(rawDepth, zNear, zFar);
+
+    float centreRawDepth = texture(depthAttachment, vec2(0.5)).r;
+    float centreDepth = (centreRawDepth >= 1.0) ? zFar * 10.0 : linearize_depth(centreRawDepth, zNear, zFar);
+
+    float depthDiff = abs(depthValue - centreDepth);
+
+    float scaledMinDiff = centreDepth * baseMinFocusFactor;
+    float scaledMaxDiff = centreDepth * baseMaxFocusFactor;
+
+    float dynamicMinFocusDiff = max(scaledMinDiff, absoluteMinDiffThreshold);
+    float dynamicMaxFocusDiff = max(scaledMaxDiff, absoluteMaxDiffThreshold);
+
+    dynamicMaxFocusDiff = max(dynamicMaxFocusDiff, dynamicMinFocusDiff + minFocusRangeWidth);
+
+    vec4 sharpColor = texture(colorAttachment, uv);
+    vec4 blurredColor = vec4(0.0);
+    for (int x = -7; x <= 7; ++x)
     {
-        for (int x = -7; x <= 7; ++x)
+        for (int y = -7; y <= 7; ++y)
         {
-            for (int y = -7; y <= 7; ++y)
-            {
-                accumulatedColor += texture(colorAttachment, uv + (vec2(x, y) / vec2(imageSize))) * gk[x + 7][y + 7];
-            }
+            vec2 sampleUV = clamp(uv + vec2(x, y) * texelSize, vec2(0.0), vec2(1.0));
+            blurredColor += texture(colorAttachment, sampleUV) * gk[x + 7][y + 7];
         }
-
-        accumulatedColor.w = 1.0;
     }
+    blurredColor.w = 1.0;
+    float blurAmount = smoothstep(dynamicMinFocusDiff, dynamicMaxFocusDiff, depthDiff);
+    vec4 finalColor = mix(sharpColor * 1.15, blurredColor, blurAmount);
 
-    imageStore(swapchainAttachment, pixelCoords, accumulatedColor);
+    imageStore(swapchainAttachment, pixelCoords, finalColor);
 }

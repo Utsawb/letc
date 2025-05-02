@@ -38,17 +38,12 @@ struct Model
     Model(const Model &) = delete;
     Model &operator=(const Model &) = delete;
 
-    // Move Constructor
     Model(Model &&other) noexcept
-        : uniform(std::move(other.uniform)),   // ObjectBuffer needs move semantics too! (See note below)
-          ds(std::move(other.ds)),             // Move shared_ptr
-          index(std::move(other.index)),       // Move VectorBuffer
-          position(std::move(other.position)), // Move VectorBuffer
-          normal(std::move(other.normal))      // Move VectorBuffer
+        : uniform(std::move(other.uniform)), ds(std::move(other.ds)), index(std::move(other.index)),
+          position(std::move(other.position)), normal(std::move(other.normal))
     {
     }
 
-    // Move Assignment Operator
     Model &operator=(Model &&other) noexcept
     {
         if (this != &other)
@@ -76,8 +71,7 @@ struct Model
 
         vk::Buffer vertexBuffers[] = {position.get(), normal.get()};
         vk::DeviceSize offsets[] = {0, 0};
-        // Bind only 2 buffers, starting from binding 0
-        c.bindVertexBuffers(0, 2, vertexBuffers, offsets); // Change 4 to 2
+        c.bindVertexBuffers(0, 2, vertexBuffers, offsets);
         c.bindIndexBuffer(index.get(), 0, vk::IndexType::eUint16);
         c.drawIndexed(static_cast<uint32_t>(index->size()), 1, 0, 0, 0);
     }
@@ -91,17 +85,17 @@ auto loadNode(std::vector<Model> &loadedModels, const tinygltf::Model &gltfModel
     const auto &rRaw = node.rotation;
     const auto &sRaw = node.scale;
 
+    gltfModel.images;
+
     if (node.translation.size() > 0)
     {
         currentTransform = glm::translate(currentTransform, glm::vec3{tRaw[0], tRaw[1], tRaw[2]});
     }
     if (node.rotation.size() > 0)
     {
-        // currentTransform *= glm::mat4_cast(glm::quat{rRaw[]});
     }
     if (node.scale.size() > 0)
     {
-        std::println("Scaling, {}, {}, {}", sRaw[0], sRaw[1], sRaw[2]);
         currentTransform = glm::scale(currentTransform, glm::vec3{sRaw[0], sRaw[1], sRaw[2]});
     }
 
@@ -109,42 +103,31 @@ auto loadNode(std::vector<Model> &loadedModels, const tinygltf::Model &gltfModel
     {
         const auto &mesh = gltfModel.meshes[node.mesh];
 
-        // --- Vertex Attribute Data ---
         const unsigned char *basePosPtr = nullptr;
         const unsigned char *baseNorPtr = nullptr;
         const unsigned char *baseTexPtr = nullptr;
 
-        size_t vertexCount = 0; // Number of vertices in this primitive
+        size_t vertexCount = 0;
 
-        // Position Attribute (Required)
         const auto posIt = primitive.attributes.find("POSITION");
         if (posIt == primitive.attributes.end())
         {
-            // Handle error: Position attribute is required by glTF specification
-            // For example, throw an exception or log an error and skip primitive
             std::cerr << "Error: Primitive missing POSITION attribute." << std::endl;
-            continue; // Skip this primitive if positions are missing
+            continue;
         }
         const auto &posAcc = gltfModel.accessors.at(posIt->second);
         const auto &posView = gltfModel.bufferViews.at(posAcc.bufferView);
         const auto &posBuff = gltfModel.buffers.at(posView.buffer);
-        vertexCount = posAcc.count; // Get the number of vertices from the position accessor
+        vertexCount = posAcc.count;
 
-        // Calculate the starting memory address for position data
         basePosPtr = posBuff.data.data() + posView.byteOffset + posAcc.byteOffset;
 
-        // Add runtime checks for safety (optional but recommended)
         assert(posAcc.type == TINYGLTF_TYPE_VEC3);
         assert(posAcc.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
 
-        // Reinterpret cast to the desired pointer type (glm::vec3*)
-        // Use const_cast only if you are *sure* you won't modify the data through this pointer,
-        // or if your subsequent operations require a non-const pointer for read-only access patterns.
-        // If you need to modify, copy the data first.
         glm::vec3 *posPtr = reinterpret_cast<glm::vec3 *>(const_cast<unsigned char *>(basePosPtr));
 
-        // Normal Attribute (Optional)
-        glm::vec3 *norPtr = nullptr; // Initialize to nullptr
+        glm::vec3 *norPtr = nullptr;
         const auto norIt = primitive.attributes.find("NORMAL");
         if (norIt != primitive.attributes.end())
         {
@@ -152,20 +135,16 @@ auto loadNode(std::vector<Model> &loadedModels, const tinygltf::Model &gltfModel
             const auto &norView = gltfModel.bufferViews.at(norAcc.bufferView);
             const auto &norBuff = gltfModel.buffers.at(norView.buffer);
 
-            // Calculate the starting memory address for normal data
             baseNorPtr = norBuff.data.data() + norView.byteOffset + norAcc.byteOffset;
 
-            // Add runtime checks (optional)
             assert(norAcc.type == TINYGLTF_TYPE_VEC3);
             assert(norAcc.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
-            assert(norAcc.count == vertexCount); // Normals should match vertex count
+            assert(norAcc.count == vertexCount);
 
-            // Reinterpret cast
             norPtr = reinterpret_cast<glm::vec3 *>(const_cast<unsigned char *>(baseNorPtr));
         }
 
-        // Texture Coordinate Attribute (Optional - checking for TEXCOORD_0)
-        glm::vec2 *texPtr = nullptr; // Initialize to nullptr
+        glm::vec2 *texPtr = nullptr;
         const auto texIt = primitive.attributes.find("TEXCOORD_0");
         if (texIt != primitive.attributes.end())
         {
@@ -173,42 +152,29 @@ auto loadNode(std::vector<Model> &loadedModels, const tinygltf::Model &gltfModel
             const auto &texView = gltfModel.bufferViews.at(texAcc.bufferView);
             const auto &texBuff = gltfModel.buffers.at(texView.buffer);
 
-            // Calculate the starting memory address for texture coordinate data
             baseTexPtr = texBuff.data.data() + texView.byteOffset + texAcc.byteOffset;
 
-            // Add runtime checks (optional)
             assert(texAcc.type == TINYGLTF_TYPE_VEC2);
             assert(texAcc.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
-            assert(texAcc.count == vertexCount); // Tex coords should match vertex count
+            assert(texAcc.count == vertexCount);
 
-            // Reinterpret cast
             texPtr = reinterpret_cast<glm::vec2 *>(const_cast<unsigned char *>(baseTexPtr));
         }
 
-        // --- Index Data (Optional but common) ---
         const unsigned char *baseIndexPtr = nullptr;
         size_t indexCount = 0;
-        int indexComponentType = 0; // e.g., TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT
+        int indexComponentType = 0;
 
         if (primitive.indices >= 0)
-        { // Check if indices are used
+        {
             const auto &indexAcc = gltfModel.accessors.at(primitive.indices);
             const auto &indexView = gltfModel.bufferViews.at(indexAcc.bufferView);
             const auto &indexBuff = gltfModel.buffers.at(indexView.buffer);
             indexCount = indexAcc.count;
             indexComponentType = indexAcc.componentType;
 
-            // Calculate the starting memory address for index data
             baseIndexPtr = indexBuff.data.data() + indexView.byteOffset + indexAcc.byteOffset;
         }
-
-        // --- Now you have the pointers and counts ---
-        // posPtr: Pointer to the first position (glm::vec3). Total count: vertexCount.
-        // norPtr: Pointer to the first normal (glm::vec3) or nullptr. Total count: vertexCount.
-        // texPtr: Pointer to the first tex coord (glm::vec2) or nullptr. Total count: vertexCount.
-        // baseIndexPtr: Pointer to the first index or nullptr. Total count: indexCount. Type depends on
-        // indexComponentType. vertexCount: Number of vertices. indexCount: Number of indices. indexComponentType: Data
-        // type of indices (e.g., TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT, TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT).
 
         loadedModels.emplace_back(allocator, layout, pool);
         auto &model = loadedModels.back();
@@ -229,25 +195,6 @@ auto loadNode(std::vector<Model> &loadedModels, const tinygltf::Model &gltfModel
         model.ds->attachBuffer("UModel", model.uniform.get(), sizeof(Model::Uniform));
         model.uniform->model = currentTransform;
         model.uniform->modelIT = glm::inverseTranspose(currentTransform);
-    
-        // Example: Accessing index data (assuming unsigned short indices)
-        /*
-        if (baseIndexPtr && indexComponentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
-             const uint16_t* indexPtr = reinterpret_cast<const uint16_t*>(baseIndexPtr);
-             for (size_t i = 0; i < indexCount; ++i) {
-                 uint16_t index = indexPtr[i];
-                 // Use index to access vertex data: posPtr[index], norPtr[index], etc.
-             }
-        }
-        */
-
-        // TODO: Use the pointers (posPtr, norPtr, texPtr, baseIndexPtr) and counts
-        // (vertexCount, indexCount) along with indexComponentType to create your
-        // engine's mesh representation, copy data to GPU buffers using your allocator, etc.
-        // Remember to apply the 'currentTransform' (or the calculated nodeTransform if you compute it earlier)
-        // to the vertex positions.
-
-        // --- End of added code ---
     }
 
     for (int childIndex : node.children)
@@ -266,9 +213,6 @@ inline auto loadModels(const std::filesystem::path &path, std::shared_ptr<letc::
     auto loadedModels = std::make_shared<std::vector<Model>>();
     tinygltf::Model gltfModel;
     tinygltf::TinyGLTF loader;
-    loader.SetImageLoader([](tinygltf::Image *, const int, std::basic_string<char> *, std::basic_string<char> *, int,
-                             int, const unsigned char *, int, void *) { return true; },
-                          nullptr);
     std::string err;
     std::string warn;
 
@@ -298,7 +242,7 @@ inline auto loadModels(const std::filesystem::path &path, std::shared_ptr<letc::
     if (!ret)
     {
         std::println(std::cerr, "Failed to load glTF file: {}", path.string());
-        return {}; // Return empty vector on failure
+        return {};
     }
 
     const tinygltf::Scene &scene = gltfModel.scenes[gltfModel.defaultScene];
