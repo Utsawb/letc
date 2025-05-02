@@ -31,9 +31,6 @@ namespace letc
         return *this;
     }
 
-    // this is my very bad code + gemini induced verbosity, fix later
-    // but honestly device selection and queue handling will require like
-    // a whole dp solution or something of that sort
     auto DeviceBuilder::build(std::weak_ptr<Instance> instance_weak) -> std::shared_ptr<Device>
     {
         auto instance = instance_weak.lock();
