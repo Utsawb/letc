@@ -6,6 +6,7 @@
 #include <format>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <iterator>
 #include <map>
 #include <memory>

@@ -94,10 +94,10 @@ namespace letc
                 u = 1.0f;
             }
 
-            std::size_t idx0 = (segmentIdx - 1 + n) % n;
+            std::size_t idx0 = (segmentIdx == 0) ? segmentIdx : segmentIdx - 1;
             std::size_t idx1 = segmentIdx;
-            std::size_t idx2 = (segmentIdx + 1 + n) % n;
-            std::size_t idx3 = (segmentIdx + 2 + n) % n;
+            std::size_t idx2 = segmentIdx + 1;
+            std::size_t idx3 = (segmentIdx == n - 2) ? segmentIdx + 1 : segmentIdx + 2;
 
             const glm::mat4 &T0 = transformations.at(idx0);
             const glm::mat4 &T1 = transformations.at(idx1);

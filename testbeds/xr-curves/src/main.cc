@@ -84,6 +84,8 @@ struct App
 
     std::unique_ptr<letc::Curves> curves;
 
+    std::optional<glm::mat4> inversePathWorldPose;
+
     size_t currentFrame = 0;
     App()
     {
@@ -173,13 +175,14 @@ struct App
 
         models.emplace_back(*allocator, resourcePath / "Avocado.glb"); // Left Hand Model
         models.emplace_back(*allocator, resourcePath / "Avocado.glb"); // Right Hand Model
-        models.emplace_back(*allocator, resourcePath / "pointy.glb");
+        models.emplace_back(*allocator, resourcePath / "city.glb");
         models.emplace_back(*allocator, resourcePath / "fish.glb");
 
         float modelScalingFactor = 10.0f;
         models.at(0).uniform.model *= glm::scale(models.at(0).uniform.model, glm::vec3(modelScalingFactor));
         models.at(1).uniform.model *= glm::scale(models.at(1).uniform.model, glm::vec3(modelScalingFactor));
-        // Scale hand models if necessary (models 2 and 3)
+
+        models.at(2).uniform.model = glm::translate(glm::identity<glm::mat4>(), glm::vec3(0.0f, -1.0f, 0.0f));
 
         std::for_each(models.begin(), models.end(), [](letc::Model &m) { m.cpyAttributes(); });
 
@@ -281,32 +284,31 @@ struct App
 
         if (eventStatus.leftJoystick != glm::vec2{0.0f, 0.0f})
         {
-            timeScaling = (eventStatus.leftJoystick.y + 1.0f) / 2.0f;
+            // timeScaling = (eventStatus.leftJoystick.y + 1.0f) / 2.0f;
         }
         if (eventStatus.rightJoystick != glm::vec2{0.0f, 0.0f})
         {
         }
 
-        if (shouldAnimate)
+        if (shouldAnimate && curves && curves->totalLength > 0.0f)
         {
-            if (frenetFrames->frames.size() > 1)
-            {
-                float t = fmod(vkfw::getTime() * timeScaling, frenetFrames->frames.size());
+            float t = curves->totalLength > 0 ? fmod(vkfw::getTime() / curves->totalLength, curves->totalLength) : 0.0f;
 
-                if (curves)
-                {
-                    models.at(3).uniform.model = curves->getInterp(t);
-                }
-            }
-            else
-            {
+            glm::mat4 fishTransform = curves->getInterp(t);
+            models.at(3).uniform.model = fishTransform;
 
-                models.at(3).uniform.model = glm::mat4(0.0f);
-            }
+            glm::vec3 offsetPosition = glm::vec3(0.0f, 0.15f, -0.4f);
+            glm::quat offsetRotation = glm::angleAxis(glm::radians(10.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+            glm::mat4 cameraOffset = glm::translate(glm::mat4(1.0f), offsetPosition) * glm::mat4_cast(offsetRotation);
+
+            glm::mat4 pathWorldPose = fishTransform * cameraOffset;
+
+            inversePathWorldPose = glm::inverse(pathWorldPose);
         }
         else
         {
             models.at(3).uniform.model = glm::mat4(0.0f);
+            inversePathWorldPose.reset();
         }
 
         // --- Update modelUniforms SSBO data ---
@@ -353,6 +355,15 @@ struct App
         for (uint32_t state = 0; state < renderingStates.size(); ++state)
         {
             auto &rs = renderingStates[state];
+
+            glm::mat4 currentViewMatrix = xrCtx.cameras[state]->uniform.view;
+
+            if (inversePathWorldPose.has_value())
+            {
+                xrCtx.cameras[state]->uniform.view = currentViewMatrix * inversePathWorldPose.value();
+            }
+
+            xrCtx.cameras[state]->cpy();
 
             descriptorManager->attachBuffer(std::format("soloCamera{}", state), 0, rs.camera->buffer->buffer,
                                             sizeof(letc::Camera::Uniform));

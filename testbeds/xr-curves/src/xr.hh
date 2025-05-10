@@ -263,7 +263,7 @@ struct XrContext
 
         xr::ReferenceSpaceCreateInfo xrSpaceInfo{};
         xrSpaceInfo.next = nullptr;
-        xrSpaceInfo.referenceSpaceType = xr::ReferenceSpaceType::Stage;
+        xrSpaceInfo.referenceSpaceType = xr::ReferenceSpaceType::Local;
         xrSpaceInfo.poseInReferenceSpace = xr::Posef{{0, 0, 0, 1}, {0, 0, 0}};
         space = session->createReferenceSpaceUnique(xrSpaceInfo, dispatchLoader);
 
